@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.23.14",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "93e040bbef859a125d9b9f1c2f64398c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"entwicklungswerkzeuge\">Entwicklungswerkzeuge</h1>\n<h2 id=\"ide\">IDE</h2>\n<span class=\"paragraph\">Als IDE wird VSCode benutzt. Alternativ k\u00f6nnten wir Jetbrains Pycharm benutzen.</span>\n<ul>\n<li>VSCode kommt mit Jupyter Integration.</li>\n<li>Lightweight</li>\n<li>Anpassbar</li>\n</ul>\n<h2 id=\"versionskontrolle\">Versionskontrolle</h2>\n<span class=\"paragraph\">Hierf\u00fcr benutzen wir GIT. Damit kennen wir uns aus und ist auch die g\u00e4ngigste Wahl. Optional wird GitHub als Backup benutzt.</span>\n<h2 id=\"annotationtools\">Annotationtools</h2>\n<span class=\"paragraph\">F\u00fcr die Annotationen der Bilder benutzen wir das acia Framework. Wir werden Datens\u00e4tze in ein Jupyter Notebook laden und diese dort mithilfe von acia annotieren und speichern.</span>\n<h1 id=\"bibliotheken\">Bibliotheken</h1>\n<h2 id=\"acia\">ACIA</h2>\n<span class=\"paragraph\">Ein Framework welches bereits die M\u00f6glichkeiten bietet zu annotieren und die vom Experiment gelieferten nd2 Dateien zu verarbeiten.</span>\n<h2 id=\"ultralytics-package\">Ultralytics-Package</h2>\n<span class=\"paragraph\">Bietet uns alles was wir f\u00fcr Training, Validierung, fine-tuning etc.. brauchen. Es liefert uns ebenso die bereits vorhandenen YOLO Modelle auf denen wir aufbauen werden.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}

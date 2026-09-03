@@ -1,0 +1,8 @@
+path: /home/ubuntu/work/workspace/Projekt/dataset
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: chamber_region
+  1: channel_region
+  

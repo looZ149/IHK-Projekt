@@ -1,0 +1,35 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.23.14",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "e84adea16542243b82203268043bb19e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"software-architektur\">Software Architektur</h1>\n<h2 id=\"frontend-fur-den-benutzer\">Frontend f\u00fcr den Benutzer</h2>\n<ul>\n<li>JavaScript mit dash zum einbinden in das Jupyter Notebook, Einbinden in den Editor selber am Ende</li>\n<li>Einfach gehalten, \u00fcbersichtlich.</li>\n<li>Ganze .nd2 Datei hochladen.<ul>\n<li>M\u00f6glichkeit mehrere .nd2 files markieren zu lassen.<ul>\n<li>M\u00f6glichkeit nur eine oder mehrere Positionen markieren zu lassen</li>\n</ul>\n</li>\n<li>Vermutlich Sinnvoll zuerst den letzten Frame der Position zu checken, ob dort ein klares Bild besteht, und dann von hinten nach vorne die ROI markieren und Stabilisieren.</li>\n</ul>\n</li>\n<li>Buttons/Dropdowns/Checkboxen - F\u00fcr die jeweiligen M\u00f6glichkeiten.</li>\n<li>Export funktion f\u00fcr die ROI, bzw. weitergabe an andere Skripts?<ul>\n<li>Vermutlich nicht n\u00f6tig da es direkt in die Jupyter Notebooks eingebunden wird.</li>\n</ul>\n</li>\n</ul>\n<h2 id=\"service\">Service</h2>\n<ul>\n<li>Bild einlesen, Format validieren. (Preprocessing)<ul>\n<li>Passt die Aufl\u00f6sung?</li>\n<li>Normalizing, Resizing</li>\n<li>Eventuelle Kontrastanpassung?</li>\n</ul>\n</li>\n<li>Inferenz - (Prediction?)<ul>\n<li>Ruft das Model(YOLOv26?) auf und \u00fcbergibt das Bild an dieses.</li>\n<li>Nimmt die Modelausgabe entgegen und gibt diese weiter.</li>\n</ul>\n</li>\n<li>Postprocessing<ul>\n<li>Ergebnisse k\u00f6nnen wir hier erst Filtern?<ul>\n<li>Sucht die am wahrscheinlich beste ROI Markierung.</li>\n</ul>\n</li>\n<li>Falls wir Resizen, m\u00fcssen wir hier wieder alles zur\u00fcck auf Originalgr\u00f6\u00dfe bringen<ul>\n<li>K\u00f6nnte problematisch werden?<ul>\n<li>H\u00f6here Fehlerquote bei niedrigeren Pixeln?</li>\n</ul>\n</li>\n</ul>\n</li>\n<li>Fasst Ergebnisse sauber zusammen.<ul>\n<li>Gibt diese eventuell weiter zum Speichern</li>\n<li>Gibt diese weiter zum Tracking, etc..</li>\n</ul>\n</li>\n</ul>\n</li>\n<li>Speicherung (?)<ul>\n<li>Falls n\u00f6tig</li>\n<li>Speichert das Ergebniss ab.</li>\n</ul>\n</li>\n</ul>\n<h2 id=\"training-unwichtig-fur-das-jupyter-notebook\">Training - Unwichtig f\u00fcr das Jupyter Notebook(?)</h2>\n<ul>\n<li>Kleiner Code zum Ausf\u00fchren von Trainingszyklen</li>\n<li>F\u00fchrt am Ende automatisch eine Validierung durch</li>\n<li>Gibt am Ende eine \"Erfolgsquote\" des Trainings zur\u00fcck.</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}

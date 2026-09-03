@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.23.14",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "e7f0937873edc7fbcaceeeaaaf459ef0",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"datenmodell\">Datenmodell</h1>\n<h2 id=\"analyzedobject-klasse\">AnalyzedObject Klasse</h2>\n<ul>\n<li>Name/ID/POS ID</li>\n<li>Koordinaten der ROI</li>\n<li>Wie viele Frames ?</li>\n<li>Ausgabe als tiff</li>\n</ul>\n<h2 id=\"ordnerstruktur\">Ordnerstruktur</h2>\n<ul>\n<li>src/</li>\n<li>src/analyze/</li>\n<li>src/output/pos_#/roi_#</li>\n<li>src/dataset/images/training</li>\n<li>src/dataset/images/validation</li>\n<li>src/dataset/images/test</li>\n<li>src/dataset/labels/training</li>\n<li>src/dataset/labels/validation</li>\n</ul>\n<h2 id=\"split-strategie\">Split-strategie</h2>\n<ul>\n<li>Wir splitten Session-wise. Jeder Split kriegt seine eigene Session.</li>\n<li>Dadurch verhindern wir Data-Leakage<ul>\n<li>Wir verhindern dass das Model mit zu \u00e4hnlichen Daten trainiert wird wie Sie im Testsplit sind.</li>\n</ul>\n</li>\n<li>Gr\u00f6\u00dfe der Aufnahmen variiert, deshalb nehmen wir die gr\u00f6\u00dferen Datens\u00e4tze f\u00fcr das Training.</li>\n</ul>\n<h2 id=\"bildvorverarbeitung-preprocessing\">Bildvorverarbeitung - Preprocessing</h2>\n<ul>\n<li>Eingabeformat Pr\u00fcfen und vereinheitlichen<ul>\n<li>Dateien kommen als nd2 an.<ul>\n<li>Direkt in tiffs umwandeln um m\u00f6glichst viel Daten zu erhalten</li>\n</ul>\n</li>\n<li>YOLO erwartet 8-Bit, nd2 liefert 12 oder 16 Bit, also runter rechnen</li>\n</ul>\n</li>\n<li>Resizing<ul>\n<li>YOLO erwartet 640x640 Pixel</li>\n<li>Resizing mit Letterboxing<ul>\n<li>Sch\u00fctzt Proportionen</li>\n<li>Keine Bildinhalte gehen verloren.</li>\n</ul>\n</li>\n<li>ND2 Bilder sind vermutlich sehr hochaufl\u00f6send. Schauen wie genau wir Resizen k\u00f6nnen.<ul>\n<li>ggf. Tiling anwenden</li>\n</ul>\n</li>\n</ul>\n</li>\n<li>Channels anpassen<ul>\n<li>YOLO erwartet 3-Channel-RGB<ul>\n<li>Wir copy pasten den Greychannel einfach auf alle 3</li>\n<li>Standartansatz, reicht wohl meistens aus</li>\n</ul>\n</li>\n</ul>\n</li>\n<li>Normalisierung um das Training zu vereinfachen - Macht YOLO automatisch<ul>\n<li>Eventuelle Kontrastnormalisierung, jenachdem wie die Belichtung variiert</li>\n</ul>\n</li>\n</ul>\n<h2 id=\"augmentierung\">Augmentierung</h2>\n<ul>\n<li>Vertikale &amp; Horizontale Flips, Rotierung</li>\n<li>Helligkeits\u00e4nderungen, ggf. um Belichtungseinstellungen zwischen verschiedenen Experimenten zu simulieren?</li>\n</ul>\n<h2 id=\"validierungsregeln\">Validierungsregeln</h2>\n<ul>\n<li>Error-Handling<ul>\n<li>Was passiert wenn falsche Bilddatei, Bild leer, kaputtes Bild etc</li>\n</ul>\n</li>\n</ul></span>"
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}
