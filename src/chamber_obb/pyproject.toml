@@ -12,6 +12,7 @@ dependencies = [
     "torch==2.14.0",
     "numpy>=2.5.2",
     "tifffile>=2026.8.23",
+    "opencv-python==5.0.0.93",
 ]
 
 [tool.setuptools]

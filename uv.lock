@@ -41,6 +41,7 @@ version = "0.1.0"
 source = { editable = "src/chamber_obb" }
 dependencies = [
     { name = "numpy" },
+    { name = "opencv-python" },
     { name = "tifffile" },
     { name = "torch" },
     { name = "ultralytics" },
@@ -49,6 +50,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=2.5.2" },
+    { name = "opencv-python", specifier = "==5.0.0.93" },
     { name = "tifffile", specifier = ">=2026.8.23" },
     { name = "torch", specifier = "==2.14.0" },
     { name = "ultralytics", specifier = "==8.4.138" },
