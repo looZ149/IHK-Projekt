@@ -11,6 +11,7 @@ import pytest
 import tifffile
 
 import chamber_obb
+from chamber_obb.errors import InvalidImageError, ModelLoadError
 from chamber_obb.inference import DEFAULT_CONFIDENCE
 from chamber_obb.pipeline import analyze
 
@@ -119,8 +120,8 @@ def test_analyze_checkpoint_path_param_takes_precedence_over_env_var(monkeypatch
     assert captured["checkpoint_path"] == "/param/checkpoint.pt"
 
 
-def test_analyze_raises_value_error_when_no_checkpoint_anywhere(monkeypatch):
-    """Weder Param noch env var gesetzt -> ValueError, bevor inference.py beruehrt wird."""
+def test_analyze_raises_model_load_error_when_no_checkpoint_anywhere(monkeypatch):
+    """Weder Param noch env var gesetzt -> ModelLoadError, bevor inference.py beruehrt wird."""
     monkeypatch.delenv("CHAMBER_OBB_CHECKPOINT", raising=False)
 
     def fail_if_called(*args, **kwargs):
@@ -129,19 +130,19 @@ def test_analyze_raises_value_error_when_no_checkpoint_anywhere(monkeypatch):
     monkeypatch.setattr("chamber_obb.pipeline.run_inference", fail_if_called)
 
     array = np.zeros((640, 640, 3), dtype=np.uint8)
-    with pytest.raises(ValueError):
+    with pytest.raises(ModelLoadError):
         analyze(array)
 
 
-def test_analyze_raises_value_error_for_invalid_image_type(monkeypatch):
-    """image=12345 -> ValueError, die den ungueltigen Typ benennt; keine Verarbeitung."""
+def test_analyze_raises_invalid_image_error_for_invalid_image_type(monkeypatch):
+    """image=12345 -> InvalidImageError, die den ungueltigen Typ benennt; keine Verarbeitung."""
 
     def fail_if_called(*args, **kwargs):
         raise AssertionError("run_inference must not be called for an invalid image type")
 
     monkeypatch.setattr("chamber_obb.pipeline.run_inference", fail_if_called)
 
-    with pytest.raises(ValueError, match="int"):
+    with pytest.raises(InvalidImageError, match="int"):
         analyze(12345, checkpoint_path="/fake/checkpoint.pt")
 
 

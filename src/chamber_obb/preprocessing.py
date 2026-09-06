@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 import tifffile
 
+from chamber_obb.errors import InvalidImageError, InvalidParameterError
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,18 +50,18 @@ def letterbox_resize(
     mit ``fill_value`` auf, statt zuzuschneiden.
     """
     if target_size <= 0:
-        raise ValueError(f"target_size must be positive, got {target_size}")
+        raise InvalidParameterError(f"target_size must be positive, got {target_size}")
     if image.ndim < 2:
-        raise ValueError(f"image must have at least 2 dimensions, got shape {image.shape}")
+        raise InvalidImageError(f"image must have at least 2 dimensions, got shape {image.shape}")
 
     orig_height, orig_width = image.shape[:2]
     if orig_width <= 0 or orig_height <= 0:
-        raise ValueError(f"image has a zero-length dimension: {image.shape}")
+        raise InvalidImageError(f"image has a zero-length dimension: {image.shape}")
 
     if np.issubdtype(image.dtype, np.integer):
         dtype_range = np.iinfo(image.dtype)
         if not (dtype_range.min <= fill_value <= dtype_range.max):
-            raise ValueError(
+            raise InvalidParameterError(
                 f"fill_value {fill_value} is out of range for dtype {image.dtype} "
                 f"({dtype_range.min}..{dtype_range.max})"
             )
@@ -68,7 +70,7 @@ def letterbox_resize(
     new_width = round(orig_width * scale)
     new_height = round(orig_height * scale)
     if new_width <= 0 or new_height <= 0:
-        raise ValueError(
+        raise InvalidImageError(
             f"scale {scale} on image {orig_width}x{orig_height} rounds a target "
             f"dimension to zero (new_width={new_width}, new_height={new_height})"
         )
@@ -122,16 +124,16 @@ def load_and_normalize(path) -> np.ndarray:
     """Laedt ein TIFF, waehlt den mittleren Frame und normalisiert zu 8-bit/3-Kanal.
 
     Raises:
-        ValueError: wenn ``path`` kein str/Path ist, der Pfad nicht existiert,
+        InvalidImageError: wenn ``path`` kein str/Path ist, der Pfad nicht existiert,
             oder die Datei leer/korrupt ist und nicht als TIFF gelesen werden kann.
     """
     if not isinstance(path, (str, Path)):
         logger.error("load_and_normalize: path is not a str or Path: %r", path)
-        raise ValueError(f"path must be a str or Path, got {type(path).__name__}")
+        raise InvalidImageError(f"path must be a str or Path, got {type(path).__name__}")
 
     if not Path(path).is_file():
         logger.error("load_and_normalize: file not found: %s", path)
-        raise ValueError(f"Image file not found: {path}")
+        raise InvalidImageError(f"Image file not found: {path}")
 
     try:
         img = tifffile.imread(path)
@@ -141,7 +143,7 @@ def load_and_normalize(path) -> np.ndarray:
             midFrame = int(midFrame)
     except Exception as exc:
         logger.error("load_and_normalize: failed to decode TIFF %s: %s", path, exc)
-        raise ValueError(f"Could not read TIFF file: {path}") from exc
+        raise InvalidImageError(f"Could not read TIFF file: {path}") from exc
 
     # Grab some mid frame for now
     if img.ndim > 2:

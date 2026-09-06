@@ -13,6 +13,7 @@ from typing import TypedDict
 
 import numpy as np
 
+from chamber_obb.errors import InvalidImageError, ModelLoadError
 from chamber_obb.inference import DEFAULT_CONFIDENCE, run_inference
 from chamber_obb.postprocessing import Detection, postprocess
 from chamber_obb.preprocessing import letterbox_resize, load_and_normalize, normalize_array
@@ -47,7 +48,7 @@ def analyze(
 
     ``checkpoint_path`` ist optional; fehlt er, wird die Umgebungsvariable
     ``CHAMBER_OBB_CHECKPOINT`` gelesen (AD-8, AD-15). Ist keins von beiden
-    gesetzt, wird ein ``ValueError`` geworfen, bevor ``inference.py``
+    gesetzt, wird ein ``ModelLoadError`` geworfen, bevor ``inference.py``
     ueberhaupt beruehrt wird -- kein stiller Default.
 
     ``metadata`` wird entgegengenommen, aber (noch) nirgends verwendet oder
@@ -56,36 +57,38 @@ def analyze(
 
     Einzelnes Frame, synchron, kein Batching (AD-7, AD-10). Ausnahmen aus
     ``load_and_normalize``/``normalize_array``/``letterbox_resize``/
-    ``run_inference``/``postprocess`` propagieren unveraendert als deren
-    aktuelle einfache ``ValueError``s (kein neues Fehler-Typing, das ist
-    Story 6).
+    ``run_inference`` propagieren unveraendert als ``ChamberOBBError``-
+    Subklassen (AD-16, Story 6); ``postprocess`` selbst wirft heute nichts.
 
     Raises:
-        ValueError: wenn ``image`` weder ein numpy-Array noch ein str/Path
-            ist, wenn ein Array-``image`` eine Form hat, die nicht Graustufen
-            (2D) oder 3-Kanal (``ndim == 3`` mit letzter Achse ``== 3``) ist,
-            oder wenn weder ``checkpoint_path`` noch die Umgebungsvariable
-            ``CHAMBER_OBB_CHECKPOINT`` gesetzt sind.
+        InvalidImageError: wenn ``image`` weder ein numpy-Array noch ein
+            str/Path ist, oder wenn ein Array-``image`` eine Form hat, die
+            nicht Graustufen (2D) oder 3-Kanal (``ndim == 3`` mit letzter
+            Achse ``== 3``) ist.
+        ModelLoadError: wenn weder ``checkpoint_path`` noch die
+            Umgebungsvariable ``CHAMBER_OBB_CHECKPOINT`` gesetzt sind.
+        InvalidParameterError: wenn ``conf`` keine Zahl in [0, 1] ist
+            (propagiert aus ``run_inference``).
     """
     if isinstance(image, (str, Path)):
         normalized = load_and_normalize(image)
     elif isinstance(image, np.ndarray):
         if (image.ndim == 3 and image.shape[-1] != 3) or image.ndim >= 4:
             logger.error("analyze: array image has an unsupported shape: %r", image.shape)
-            raise ValueError(
+            raise InvalidImageError(
                 f"image array must be 2D grayscale or 3D with 3 channels, got shape {image.shape}"
             )
         normalized = normalize_array(image)
     else:
         logger.error("analyze: image is neither a numpy array nor a str/Path: %r", type(image))
-        raise ValueError(f"image must be a numpy array or str/Path, got {type(image).__name__}")
+        raise InvalidImageError(f"image must be a numpy array or str/Path, got {type(image).__name__}")
 
     resolved_checkpoint = checkpoint_path or os.environ.get(_CHECKPOINT_ENV_VAR)
     if not resolved_checkpoint:
         logger.error(
             "analyze: no checkpoint_path given and %s is not set", _CHECKPOINT_ENV_VAR
         )
-        raise ValueError(
+        raise ModelLoadError(
             f"No checkpoint path given and {_CHECKPOINT_ENV_VAR} is not set"
         )
 

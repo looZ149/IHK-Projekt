@@ -15,6 +15,8 @@ import numpy as np
 from ultralytics import YOLO
 from ultralytics.engine.results import Results
 
+from chamber_obb.errors import InvalidParameterError, ModelLoadError
+
 logger = logging.getLogger(__name__)
 
 # Einziger benannter Confidence-Threshold der Bibliothek (AD-17). Entspricht
@@ -38,7 +40,7 @@ def _get_model(checkpoint_path: str | Path) -> YOLO:
     nebenlaeufige Erstaufrufe nicht doppelt laden oder sich ueberschreiben.
 
     Raises:
-        ValueError: wenn die Datei zwischen dem Existenz-Check in
+        ModelLoadError: wenn die Datei zwischen dem Existenz-Check in
             ``run_inference`` und diesem Ladevorgang verschwunden ist oder
             ultralytics sie nicht als Checkpoint laden kann (TOCTOU).
     """
@@ -63,7 +65,7 @@ def _get_model(checkpoint_path: str | Path) -> YOLO:
             # fuer eine leere/abgeschnittene/korrupte .pt-Datei (siehe
             # ultralytics.nn.tasks.torch_safe_load).
             logger.error("failed to load checkpoint %s: %s", key, exc)
-            raise ValueError(f"failed to load checkpoint {key}: {exc}") from exc
+            raise ModelLoadError(f"failed to load checkpoint {key}: {exc}") from exc
         _MODEL_CACHE[key] = model
         return model
 
@@ -81,21 +83,22 @@ def run_inference(
     Filterung sind Sache von ``postprocessing.py`` (Story 4).
 
     Raises:
-        ValueError: wenn ``checkpoint_path`` kein str/Path ist, nicht auf eine
-            Datei zeigt, oder ``conf`` keine Zahl in [0, 1] ist.
+        ModelLoadError: wenn ``checkpoint_path`` kein str/Path ist oder nicht
+            auf eine Datei zeigt.
+        InvalidParameterError: wenn ``conf`` keine Zahl in [0, 1] ist.
     """
     if not isinstance(checkpoint_path, (str, Path)):
         logger.error("run_inference: checkpoint_path is not a str or Path: %r", checkpoint_path)
-        raise ValueError(f"checkpoint_path must be a str or Path, got {type(checkpoint_path).__name__}")
+        raise ModelLoadError(f"checkpoint_path must be a str or Path, got {type(checkpoint_path).__name__}")
 
     if not isinstance(conf, (int, float)) or not (0 <= conf <= 1):
         logger.error("run_inference: conf is not a number in [0, 1]: %r", conf)
-        raise ValueError(f"conf must be a number in [0, 1], got {conf!r}")
+        raise InvalidParameterError(f"conf must be a number in [0, 1], got {conf!r}")
 
     resolved = Path(checkpoint_path)
     if not resolved.is_file():
         logger.error("checkpoint path does not exist: %s", checkpoint_path)
-        raise ValueError(f"checkpoint path does not exist: {checkpoint_path}")
+        raise ModelLoadError(f"checkpoint path does not exist: {checkpoint_path}")
 
     model = _get_model(checkpoint_path)
     results = model.predict(image, conf=conf, save=False, verbose=False)

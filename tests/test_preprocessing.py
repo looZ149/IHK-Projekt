@@ -9,8 +9,10 @@ CAP-1 geforderte 3-Kanal-RGB-Bild. Story 5 fixt die Bedingung zu
 """
 
 import numpy as np
+import pytest
 
-from chamber_obb.preprocessing import normalize_array
+from chamber_obb.errors import InvalidImageError
+from chamber_obb.preprocessing import load_and_normalize, normalize_array
 
 
 def test_normalize_array_stacks_2d_uint16_to_3_channel():
@@ -33,3 +35,20 @@ def test_normalize_array_leaves_already_3_channel_uint8_untouched_in_shape():
     assert result.ndim == 3
     assert result.shape == (480, 640, 3)
     assert result.dtype == np.uint8
+
+
+def test_load_and_normalize_raises_invalid_image_error_for_nonexistent_path(tmp_path):
+    """Ein Pfad, der nicht existiert, wirft InvalidImageError."""
+    missing = tmp_path / "does-not-exist.tiff"
+
+    with pytest.raises(InvalidImageError, match=str(missing)):
+        load_and_normalize(missing)
+
+
+def test_load_and_normalize_raises_invalid_image_error_for_corrupt_tiff(tmp_path):
+    """Eine abgeschnittene/korrupte Datei, die nicht als TIFF dekodiert werden kann, wirft InvalidImageError."""
+    corrupt = tmp_path / "corrupt.tiff"
+    corrupt.write_bytes(b"not a real tiff file")
+
+    with pytest.raises(InvalidImageError, match=str(corrupt)):
+        load_and_normalize(corrupt)
