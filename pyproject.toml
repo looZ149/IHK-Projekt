@@ -11,6 +11,9 @@ dependencies = [
 
 [tool.uv]
 package = false
+# Deprecated by uv (it suggests dependency-groups.dev instead) but kept as-is:
+# this is the exact key Story 4's spec called for. Known, accepted tradeoff.
+dev-dependencies = ["pytest>=8.3"]
 
 [tool.uv.workspace]
 members = ["src/chamber_obb"]
