@@ -94,6 +94,30 @@ def letterbox_resize(
     return canvas, info
 
 
+def normalize_array(img: np.ndarray) -> np.ndarray:
+    """Normalisiert ein bereits extrahiertes Frame-Array zu 8-bit/3-Kanal.
+
+    Geteilte Logik zwischen ``load_and_normalize`` (Pfad-Input) und
+    ``pipeline.analyze`` (Array-Input, Story 5) -- beide Formen durchlaufen
+    dieselbe Normalisierung (human decision: Arrays gelten nicht bereits als
+    normalisiert).
+
+    Behebt den zuvor verifizierten Bug: die Kanal-Stapel-Bedingung stapelt
+    jetzt korrekt, wenn das Bild noch 2D ist (``img.ndim == 2``), nicht wenn
+    es das nicht ist -- ``!= 2`` hat fuer den haeufigen Fall (Graustufen-TIFF
+    nach Midframe-Extraktion, bereits 2D) nie ausgeloest und still ein 2D-Array
+    statt des von CAP-1 geforderten 3-Kanal-RGB-Bilds zurueckgegeben.
+    """
+    # Convert to 8 Bit (Perzentil-Clipping statt Min-Max, siehe Grund unten)
+    if img.dtype != np.uint8:
+        img = normalize_to_8bit(img)
+
+    if img.ndim == 2:
+        img = np.stack([img] * 3, axis=-1)
+
+    return img
+
+
 def load_and_normalize(path) -> np.ndarray:
     """Laedt ein TIFF, waehlt den mittleren Frame und normalisiert zu 8-bit/3-Kanal.
 
@@ -123,14 +147,7 @@ def load_and_normalize(path) -> np.ndarray:
     if img.ndim > 2:
         img = img[midFrame]
 
-    # Convert to 8 Bit (Perzentil-Clipping statt Min-Max, siehe Grund unten)
-    if img.dtype != np.uint8:
-        img = normalize_to_8bit(img)
-
-    if img.ndim != 2:
-        img = np.stack([img] * 3, axis=-1)
-
-    return img
+    return normalize_array(img)
 
 
 def preprocess(path) -> tuple[np.ndarray, LetterboxInfo]:
