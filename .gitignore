@@ -1,0 +1,20 @@
+# BMAD Method (local tooling, not part of project source)
+.claude/
+_bmad/
+_bmad-output/
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+*.pt
+
+# Training-run outputs (generated, never source)
+dataset/
+runs/
+inference_check/
+inference_results/
+verify_output/
+dataset_leaveout_*/
+train_locked_chips.txt

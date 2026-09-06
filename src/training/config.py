@@ -1,5 +1,5 @@
 from ultralytics import YOLO
-from preprocessing import load_and_normalize
+from chamber_obb.preprocessing import load_and_normalize
 from pathlib import Path
 
 # Trainingparameters
