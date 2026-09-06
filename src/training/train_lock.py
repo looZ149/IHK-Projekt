@@ -9,18 +9,26 @@ verfaelscht (das Modell "kennt" ihn ja schon aus einem frueheren Lauf) - auch
 wenn der AKTUELLE Datensatz selbst sauber getrennt ist.
 
 Verwendung in build_training_dataset.py:
-    from train_lock import load_locked_chips, update_locked_chips
+    from train_lock import discover_filesystem_train_chips, load_locked_chips, update_locked_chips
     ...
     locked = load_locked_chips()
+    locked |= discover_filesystem_train_chips(dataset_root)  # AD-18: Textdatei allein reicht nicht
     forced_train |= locked   # zusaetzlich zu manuell via --train-chips
     ...
     # nach erfolgreichem Lauf:
     update_locked_chips(forced_train | {n for n, s in assignment.items() if s == "train"})
 """
 
+import re
 from pathlib import Path
 
 LOCK_FILE = Path("train_locked_chips.txt")
+
+# Muss mit build_trainingsdata.py's Bild-Schreibstelle (process_selection_file:
+# name = f"{folder.name}_pos{pos}_frame{frame_idx:03d}") synchron bleiben - kein
+# gemeinsamer Konstantenname, daher hier nur ein Verweis-Kommentar als
+# Desync-Schutz.
+_CHIP_NAME_SUFFIX_RE = re.compile(r"_pos\d+_frame\d+$")
 
 
 def load_locked_chips() -> set[str]:
@@ -28,6 +36,29 @@ def load_locked_chips() -> set[str]:
     if not LOCK_FILE.exists():
         return set()
     return {line.strip() for line in LOCK_FILE.read_text().splitlines() if line.strip()}
+
+
+def discover_filesystem_train_chips(dataset_root: Path) -> set[str]:
+    """Findet Chip-Ordnernamen, die AKTUELL unter dataset_root/images/train/
+    vorhanden sind (AD-18) -- niemals train_locked_chips.txt allein vertrauen,
+    da CAP-5s Annotationsworkflow Sessions direkt dort ablegen kann, ohne
+    train_lock.py ueberhaupt zu kennen. Muss VOR clean_split_dirs() aufgerufen
+    werden, sonst sieht diese Funktion nur den eigenen, frisch geschriebenen
+    Output dieses Laufs.
+    """
+    train_images_dir = dataset_root / "images" / "train"
+    if not train_images_dir.is_dir():
+        return set()
+    names: set[str] = set()
+    for f in train_images_dir.glob("*.png"):
+        name = _CHIP_NAME_SUFFIX_RE.sub("", f.stem)
+        if name and name != f.stem:  # nicht-Treffer UND einen entarteten Leer-Praefix-Treffer ausschliessen
+            names.add(name)
+        elif name == f.stem:
+            print(f"Warnung: Datei '{f.name}' unter {train_images_dir} entspricht nicht dem "
+                  f"erwarteten Namensschema (<chip>_pos<N>_frame<M>.png) - wird bei der "
+                  f"Sperrlisten-Erkennung ignoriert.", flush=True)
+    return names
 
 
 def update_locked_chips(train_folder_names: set[str]) -> None:

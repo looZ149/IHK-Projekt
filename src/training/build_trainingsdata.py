@@ -46,7 +46,7 @@ from PIL import Image
 from acia.segm.open import open_sequence  # Pfad ggf. anpassen, falls Modul woanders liegt
 
 from config import CHIPS_PATH, SEED
-from train_lock import load_locked_chips, update_locked_chips
+from train_lock import discover_filesystem_train_chips, load_locked_chips, update_locked_chips
 
 SPLITS = ("train", "val", "test")
 MIN_FOLDERS_PER_SPLIT = {"val": 1, "test": 2}
@@ -366,6 +366,8 @@ def process_selection_file(
                 frame = raw[..., 0] if raw.ndim == 3 else raw
                 img_8bit = normalize_to_8bit(frame)
 
+                # Namensschema muss synchron bleiben mit train_lock.py's
+                # _CHIP_NAME_SUFFIX_RE (AD-18-Erkennung parst genau dieses Format).
                 name = f"{folder.name}_pos{pos}_frame{frame_idx:03d}"
                 Image.fromarray(img_8bit).save(images_dir / f"{name}.png")
 
@@ -577,8 +579,10 @@ def main() -> None:
     # Checkpoint aus (der diese Ordner schon "kennt") gegen einen Val/Test-Split
     # auswerten, der eigentlich nicht mehr unabhaengig ist.
     locked_chips = load_locked_chips()
+    locked_chips |= discover_filesystem_train_chips(dataset_root)
     if locked_chips:
-        print(f"Aus train_locked_chips.txt dauerhaft auf Train gesperrt: "
+        print(f"Dauerhaft auf Train gesperrt (aus train_locked_chips.txt und/oder bereits "
+              f"vorhandenen Dateien unter {dataset_root}/images/train/): "
               f"{', '.join(sorted(locked_chips))}", flush=True)
     forced_train |= locked_chips
 
