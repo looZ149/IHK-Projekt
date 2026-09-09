@@ -1,0 +1,22 @@
+[project]
+name = "ihk-projekt"
+version = "0.1.0"
+description = "uv workspace root wiring in the chamber_obb library core plus ultralytics/torch for training/ scripts; PIL comes in transitively via ultralytics, and acia (also imported directly by some training/ scripts) is intentionally not declared here or installed in this stripped repo, per AGENTS.md."
+requires-python = ">=3.12"
+dependencies = [
+    "chamber_obb",
+    "ultralytics==8.4.138",
+    "torch==2.14.0",
+]
+
+[tool.uv]
+package = false
+# Deprecated by uv (it suggests dependency-groups.dev instead) but kept as-is:
+# this is the exact key Story 4's spec called for. Known, accepted tradeoff.
+dev-dependencies = ["pytest>=8.3"]
+
+[tool.uv.workspace]
+members = ["src/chamber_obb"]
+
+[tool.uv.sources]
+chamber_obb = { workspace = true }

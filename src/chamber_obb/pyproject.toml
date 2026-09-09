@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chamber_obb"
+version = "0.1.0"
+description = "Library core for bioprocess chamber/channel OBB detection (preprocess -> infer -> postprocess)."
+requires-python = ">=3.12"
+dependencies = [
+    "ultralytics==8.4.138",
+    "torch==2.14.0",
+    "numpy>=2.5.2",
+    "tifffile>=2026.8.23",
+    "opencv-python==5.0.0.93",
+]
+
+[tool.setuptools]
+packages = ["chamber_obb"]
+
+# Flat layout: this pyproject.toml lives one level inside the package dir it
+# describes (matches the architecture spine's Structural Seed), so the
+# package's own root ("." from here) is what setuptools installs as "chamber_obb".
+[tool.setuptools.package-dir]
+chamber_obb = "."
