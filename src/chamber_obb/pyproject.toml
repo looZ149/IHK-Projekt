@@ -15,6 +15,13 @@ dependencies = [
     "opencv-python==5.0.0.93",
 ]
 
+# acia is only needed by chamber_obb.dashboard (AD-2) -- never a hard
+# dependency of the core detection path (`import chamber_obb` must succeed
+# without it). `nd2` for real .nd2 acquisitions, `widget` for
+# anywidget/SequenceDashboard.
+[project.optional-dependencies]
+dashboard = ["acia[nd2,widget]==0.4.0"]
+
 [tool.setuptools]
 packages = ["chamber_obb"]
 
