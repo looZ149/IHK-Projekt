@@ -13,10 +13,23 @@ dependencies = [
 package = false
 # Deprecated by uv (it suggests dependency-groups.dev instead) but kept as-is:
 # this is the exact key Story 4's spec called for. Known, accepted tradeoff.
-dev-dependencies = ["pytest>=8.3"]
+# acia is here (not in chamber_obb's own dependencies) so `uv run pytest`
+# exercises the real acia half of the dashboard integration -- see the
+# `tool.uv.sources` override below for where it actually comes from. No
+# version pin here: the `tool.uv.sources` path override below resolves this
+# straight to the local ../acia-core checkout regardless of any specifier
+# (confirmed: uv lock does not error even against an impossible pin), so a
+# pin here would be decorative. The real, enforced pin for actual downstream
+# installs (from PyPI) lives in src/chamber_obb/pyproject.toml's `dashboard`
+# extra.
+dev-dependencies = ["pytest>=8.3", "acia[nd2,widget]"]
 
 [tool.uv.workspace]
 members = ["src/chamber_obb"]
 
 [tool.uv.sources]
 chamber_obb = { workspace = true }
+# Real acia from the sibling checkout, not PyPI -- so `uv run pytest` gets
+# the actual acia-core source without shipping it to end users (acia is
+# declared only as chamber_obb's own `dashboard` optional extra for them).
+acia = { path = "../acia-core", editable = true }

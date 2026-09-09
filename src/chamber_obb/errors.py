@@ -26,3 +26,7 @@ class ModelLoadError(ChamberOBBError):
 
 class InvalidParameterError(ChamberOBBError):
     """Ein Parameterwert liegt ausserhalb seines gueltigen Bereichs/Typs."""
+
+
+class DashboardIntegrationError(ChamberOBBError):
+    """Von acia ausgehender Fehler beim Oeffnen der Sequenz oder des Dashboards."""

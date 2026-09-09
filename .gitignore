@@ -9,6 +9,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 *.pt
+build/
 
 # Training-run outputs (generated, never source)
 dataset/
