@@ -12,13 +12,13 @@ KI-gestützte Bildverarbeitungsanwendung for automated analysis of bioprocess-en
 ## Where things are
 
 - `chamber_obb` library (`src/chamber_obb/`): the only public entry point is `analyze()` in `pipeline.py`. `preprocessing`/`inference`/`postprocessing` are implementation detail — never import them directly.
-- Planned dashboard integration (not yet built): `analyze()` results are meant to feed an existing private dashboard Jupyter notebook as a background process — see "Dashboard-Integration" in `docs/Anwenderdokumentation.md`. The notebooks live in the sibling folder `../01_SequencePreprocessing`, which depends on the `acia` library — full `acia` source is in the sibling folder `../acia-core`.
+- Dashboard integration (built, `src/chamber_obb/dashboard.py`): `open_annotated_dashboard()` runs `analyze()` per position of an acia sequence and opens `acia.notebook.SequenceDashboard` pre-populated with the detections — see "Dashboard-Integration" in `docs/Anwenderdokumentation.md`. `acia` is only ever imported inside `dashboard.py` (an optional `chamber_obb[dashboard]` extra) — the core `analyze()` path stays acia-free. The consuming notebook lives in the sibling folder `../01_SequencePreprocessing` (`SequencePreprocessing_v2.ipynb`), which depends on the `acia` library — full `acia` source is in the sibling folder `../acia-core`. Neither sibling folder is a git repo tracked by this one.
 - Planning/analysis (marimo notebooks, German): `Analysephase/` (model research), `Planungsphase/` (architecture, data structure, training/validation concepts, tooling). Not frozen — update them to stay accurate as the project evolves.
 
 ## Running and verifying
 
-- `uv sync` installs `chamber_obb` (workspace member) + `ultralytics`/`torch`. `uv run pytest` runs the 38-test suite (all pass); no CI configured.
-- `acia` is intentionally not declared in `pyproject.toml` (see its description) — install it separately via `pip` from the sibling `../acia-core` checkout when working with acia-dependent code.
+- `uv sync` installs `chamber_obb` (workspace member) + `ultralytics`/`torch`, plus `pytest` and `acia[nd2,widget]` as dev-dependencies (resolved from the local `../acia-core` checkout via `tool.uv.sources`). `uv run pytest` runs the 48-test suite (all pass); no CI configured.
+- `acia` is a dev-dependency here only (so `uv run pytest` exercises the real dashboard integration) — never a main dependency of `chamber_obb` itself, so `import chamber_obb` works without it. Outside this uv workspace (e.g. a standalone notebook environment on another machine), install it separately: see "Dashboard-Integration" in `docs/Anwenderdokumentation.md`, or `../01_SequencePreprocessing/00_installation.ipynb` for the exact command.
 - No trained checkpoint ships in this repo — `analyze()` raises `ModelLoadError` until `CHAMBER_OBB_CHECKPOINT` (env var) or `checkpoint_path` is set. Promotion is a manual, human-executed step — never automatic — full checklist in `RELEASE.md`.
 - `training/`: does not run on this machine. Hardcoded paths in `config.py`/`data.yaml` (`/home/ubuntu/work/workspace/Projekt/...`) point at the remote KIT box on purpose — never "fix" them to local paths. `train_lock.py` enforces that chip folders ever used in training stay in the train split forever, to avoid val/test leakage.
 

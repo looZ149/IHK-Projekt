@@ -59,8 +59,8 @@ detections = chamber_obb.analyze(
   sonst wirft `analyze()` einen `InvalidImageError`.
 - `metadata` (optional): ein `FrameMetadata`-Dict (aktuell ohne definierte
   Felder). Wird entgegengenommen, aber von `analyze()` nirgends ausgewertet —
-  die Signatur ist bereits auf eine spätere Dashboard-Integration
-  vorbereitet, die es in diesem Repo noch nicht gibt.
+  auch nicht von der Dashboard-Integration (`dashboard.py`) weiter unten,
+  die `analyze()` ohne `metadata` aufruft.
 - `checkpoint_path` (optional, `str | Path`): Pfad zu einem trainierten
   YOLO-OBB-Checkpoint (`.pt`-Datei). Fehlt er, liest `analyze()` stattdessen
   die Umgebungsvariable `CHAMBER_OBB_CHECKPOINT`. Ist **keins** von beiden
@@ -103,11 +103,61 @@ except ChamberOBBError as exc:
     ...  # eigene Fehlerbehandlung
 ```
 
-**Hinweis zur Dashboard-Integration:** Perspektivisch soll dieses Projekt als
-Hintergrundprozess Detektionsergebnisse in ein bereits bestehendes, privates
-Dashboard-Notebook einspeisen. Diese Integration existiert in diesem Repo
-noch nicht — der oben beschriebene direkte Aufruf von `chamber_obb.analyze()`
-ist heute die einzige reale, funktionierende Schnittstelle.
+## Dashboard-Integration
+
+Neben dem direkten `analyze()`-Aufruf gibt es eine zweite, ebenfalls reale
+Schnittstelle: `chamber_obb.dashboard.open_annotated_dashboard()`
+(`src/chamber_obb/dashboard.py`). Sie führt `analyze()` auf einem
+repräsentativen Frame (die mittlere Zeitaufnahme) je Position einer
+`acia`-Sequenz (nd2/czi) aus, wandelt jede Detektion in eine
+`acia.selection.RoiSelection` um und öffnet damit
+`acia.notebook.SequenceDashboard` über `.resume()` — vorbefüllt mit den vom
+Modell vorgeschlagenen ROIs statt einer leeren Leinwand. Der Aufruf ist
+synchron und blockiert, bis das Dashboard bereit ist.
+
+```python
+from acia.segm.open import open_sequence
+import chamber_obb.dashboard
+
+f = open_sequence("/pfad/zur/aufnahme.nd2")
+dash = chamber_obb.dashboard.open_annotated_dashboard(
+    f,
+    checkpoint_path=None,   # wie bei analyze(): optional, sonst CHAMBER_OBB_CHECKPOINT
+    conf=0.8,
+    roi_mode="multi",        # "single" (<=1 ROI/Position) oder "multi" (Default)
+    save_dir=None,            # Standard-Ausgabeverzeichnis für SequenceDashboard.save
+    preview_frame=None,       # None = mittlere Zeitaufnahme
+)
+dash
+```
+
+Diese Funktion ist es auch, die die produktive Notebook-Zelle in
+`../01_SequencePreprocessing/SequencePreprocessing_v2.ipynb` aufruft.
+
+**Wichtig — nur in `dashboard.py`, nicht im Core:** `acia` wird
+ausschließlich von `dashboard.py` importiert (optionale
+`chamber_obb[dashboard]`-Extra). `import chamber_obb` und der oben
+beschriebene `analyze()`-Pfad funktionieren weiterhin vollständig ohne
+`acia` installiert.
+
+**Fehlerbehandlung:** Ein Fehler bei der Detektion auf einer einzelnen
+Position wird geloggt und wie null Detektionen für diese Position behandelt
+— der Lauf über die übrigen Positionen läuft weiter. Ein `ModelLoadError`
+(fehlender/ungültiger Checkpoint) ist davon ausgenommen und propagiert
+unverändert, da er kein auf eine Position isolierbarer Fehler ist, sondern
+ein systemischer Konfigurationsfehler. Jeder von `acia` selbst ausgehende
+Fehler beim Öffnen der Sequenz, Bauen des Manifests oder Öffnen des
+Dashboards wird als `chamber_obb.errors.DashboardIntegrationError`
+geworfen (erbt ebenfalls von `ChamberOBBError`).
+
+**Installation der `acia`-Abhängigkeit:** `acia==0.4.0` ist nicht auf
+öffentlichem PyPI verfügbar. In diesem Repo kommt es beim Entwickeln/Testen
+über einen lokalen, editierbaren Checkout aus `../acia-core`
+(`pyproject.toml` → `tool.uv.sources`). Für eine eigenständige Installation
+(z. B. auf einer anderen Maschine, ohne diesen uv-Workspace) `acia` stattdessen
+direkt aus dem privaten GitLab-Repo installieren — der genaue
+`pip install`-Befehl mit Zugangsdaten steht in
+`../01_SequencePreprocessing/00_installation.ipynb`.
 
 ## Ergebnisse interpretieren
 
@@ -140,7 +190,8 @@ Wichtig für die Interpretation:
   liefert kein `best.pt`. Ohne einen selbst bereitgestellten, trainierten
   YOLO-OBB-Checkpoint kann kein echter End-to-End-Lauf durchgeführt werden —
   `analyze()` bricht dann mit `ModelLoadError` ab.
-- **Keine Dashboard-Integration:** Die geplante Anbindung an das bestehende,
-  private Dashboard-Notebook ist noch nicht umgesetzt. Der direkte Aufruf
-  von `chamber_obb.analyze()`, wie oben beschrieben, ist die aktuell einzige
-  reale Schnittstelle.
+- **Dashboard-Notebook nicht Teil dieses Repos:** `open_annotated_dashboard()`
+  selbst ist fertig (siehe "Dashboard-Integration" oben), aber das
+  konsumierende Notebook (`SequencePreprocessing_v2.ipynb`) und `acia` liegen
+  außerhalb dieses Repos, in den nicht von hier aus versionierten
+  Geschwisterordnern `../01_SequencePreprocessing` und `../acia-core`.
