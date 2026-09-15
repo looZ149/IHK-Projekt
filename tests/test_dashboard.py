@@ -183,6 +183,26 @@ def test_no_checkpoint_configured_propagates_model_load_error_unchanged(monkeypa
         open_annotated_dashboard(path, checkpoint_path=None)
 
 
+def test_resumed_selections_are_flattened_for_the_widget_js(monkeypatch, tmp_path):
+    """Workaround for an acia-core bug (docs/issues.md): SequenceDashboard.resume()
+    assigns dash.selections in the nested on-disk shape ({"roi": {"center", "size",
+    "angle"}}), but the widget's JS only ever reads the flat shape (x/y/w/h/angle
+    directly on each entry) that interactively-drawn ROIs use. Left uncorrected, a
+    resumed ROI renders as an inert dot and crashes the editor on click. Verify
+    open_annotated_dashboard() hands back the flat shape instead."""
+    path = _make_acquisition(tmp_path, n_positions=1, n_timepoints=1)
+    monkeypatch.setattr("chamber_obb.dashboard.analyze", lambda *a, **kw: [_detection()])
+
+    dash = open_annotated_dashboard(path, checkpoint_path="/fake/checkpoint.pt")
+
+    assert len(dash.selections) == 1
+    sel = dash.selections[0]
+    assert "roi" not in sel
+    assert (sel["x"], sel["y"]) == pytest.approx((6.0, 5.5))
+    assert (sel["w"], sel["h"]) == (8, 7)
+    assert sel["angle"] == pytest.approx(0.0)
+
+
 def test_corners_to_rotated_crop_spec_round_trip():
     """CAP-1: ein bekannter Eckpunkt-Satz -> RotatedCropSpec -> rekonstruierte
     Eckpunkte stimmen (innerhalb Toleranz) mit dem Original ueberein."""
