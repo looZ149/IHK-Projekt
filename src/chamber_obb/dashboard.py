@@ -147,6 +147,37 @@ def _detect_rois_for_frames(
     return selections
 
 
+def _flatten_resumed_selections(dash: SequenceDashboard) -> None:
+    """Workaround fuer einen acia-core-Bug (siehe ``docs/issues.md``):
+    ``SequenceDashboard.resume()`` setzt ``dash.selections`` im
+    verschachtelten On-Disk-Format (``{"roi": {"center", "size", "angle"}}``),
+    aber das Widget-JS liest beim Rendern ausschliesslich das flache Format
+    (``x``/``y``/``w``/``h``/``angle`` direkt auf jedem Eintrag), wie es
+    interaktiv gezeichnete ROIs verwenden -- nichts konvertiert zwischen
+    beiden. Eine resumte Box wird dadurch nur als toter Punkt gerendert und
+    stuerzt beim Anklicken ab (``sel.angle.toFixed`` auf ``undefined``).
+
+    Laeuft, bevor das Widget jemals angezeigt wird (Jupyter loest anywidgets
+    JS-``render()`` erst beim Anzeigen von ``dash`` aus, nicht bei dieser
+    Zuweisung) -- die Korrektur hier reicht deshalb aus, kein erneutes
+    Rendern noetig. Ein No-Op fuer jeden bereits flachen Eintrag, damit
+    dieser Workaround harmlos bleibt, sobald der Upstream-Bug behoben ist.
+    """
+    fixed = []
+    for sel in dash.selections:
+        roi = sel.get("roi")
+        if roi is None:
+            fixed.append(sel)
+            continue
+        sel = dict(sel)
+        roi = sel.pop("roi")
+        sel["x"], sel["y"] = roi["center"]
+        sel["w"], sel["h"] = roi["size"]
+        sel["angle"] = roi["angle"]
+        fixed.append(sel)
+    dash.selections = fixed
+
+
 def open_annotated_dashboard(
     source,
     checkpoint_path: str | os.PathLike | None = None,
@@ -229,12 +260,14 @@ def open_annotated_dashboard(
                 selections=selections,
                 roi_mode=roi_mode,
             )
-            return SequenceDashboard.resume(
+            dash = SequenceDashboard.resume(
                 manifest,
                 source=seqfile,
                 save_dir=save_dir,
                 preview_frame=frame_index,
             )
+            _flatten_resumed_selections(dash)
+            return dash
         except ChamberOBBError:
             raise
         except Exception as exc:
