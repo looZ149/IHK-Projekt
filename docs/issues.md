@@ -99,3 +99,29 @@ restored.append({
 4. Click the selection's row in the selections list — widget throws
    `Cannot read properties of undefined (reading 'toFixed')` in
    `renderSpec`, editor becomes unresponsive.
+
+### Status: worked around downstream, not fixed upstream
+
+**Still open in `acia-core`** — the fix above hasn't been applied there, and
+this issue hasn't been filed on GitLab yet. A human curator's own
+save-then-`.resume()` workflow is therefore still broken today.
+
+**Worked around in `chamber_obb`**, since `open_annotated_dashboard()`
+controls its own `dash` before ever returning it to the caller (and the
+widget's JS only runs once `dash` is actually displayed, not when
+`.resume()` returns in Python — so a Python-side correction in between is
+enough, no re-render needed):
+
+- `src/chamber_obb/dashboard.py::_flatten_resumed_selections()` — converts
+  each selection's nested `roi: {center, size, angle}` into the flat
+  `x`/`y`/`w`/`h`/`angle` shape the widget JS actually reads, right after
+  `SequenceDashboard.resume()` returns. No-op for anything already flat, so
+  it stays harmless once/if the upstream fix above lands.
+- Test: `tests/test_dashboard.py::test_resumed_selections_are_flattened_for_the_widget_js`.
+- Commit: [`4e433ed`](https://github.com/looZ149/IHK-Projekt/commit/4e433ed62b3feaf92272fa9db6e2e0ea3a7972fc)
+  (tag `dashboard-fix-1`), branch `fix/dashboard-resume-flatten-workaround`.
+
+This unblocks `open_annotated_dashboard()` specifically. It does **not**
+help a manual `SequenceDashboard.resume()` call outside chamber_obb (e.g. a
+curator resuming their own saved `selection.json`) — that still needs the
+real fix in `acia-core` itself.
