@@ -261,7 +261,8 @@ def test_default_confidence_matches_inference_default():
     assert chamber_obb.dashboard._DEFAULT_CONFIDENCE == chamber_obb.inference.DEFAULT_CONFIDENCE
 
 
-def test_public_namespace_still_exposes_only_analyze_and_frame_metadata():
-    """AD-3 Regression: chamber_obb/__init__.py ist von dieser Aenderung
-    unberuehrt -- weiterhin exakt {analyze, FrameMetadata}."""
-    assert chamber_obb.__all__ == ["FrameMetadata", "analyze"]
+def test_public_namespace_does_not_expose_the_dashboard():
+    """AD-3 Regression: ``chamber_obb.dashboard`` (acia) bleibt ausserhalb von ``__all__`` und wird
+    von ``chamber_obb/__init__.py`` nicht importiert; die Trainings-API (AD-2, CAP-7) ist erlaubt."""
+    assert "open_annotated_dashboard" not in chamber_obb.__all__
+    assert {"analyze", "FrameMetadata"} <= set(chamber_obb.__all__)

@@ -30,3 +30,35 @@ class InvalidParameterError(ChamberOBBError):
 
 class DashboardIntegrationError(ChamberOBBError):
     """Von acia ausgehender Fehler beim Oeffnen der Sequenz oder des Dashboards."""
+
+
+class DatasetDescriptorError(ChamberOBBError):
+    """``dataset.json`` fehlt, ist beschaedigt oder passt nicht zum Datensatz-Inhalt (AD-23)."""
+
+
+class DatasetBuildError(ChamberOBBError):
+    """``build_dataset()`` kann nicht starten oder einen Chip-Ordner nicht verarbeiten (AD-20)."""
+
+
+class ClassListMismatchError(ChamberOBBError):
+    """Klassenliste von Checkpoint oder Datensatz weicht von der Paket-Klassenliste ab (AD-21)."""
+
+
+class LeakageError(ChamberOBBError):
+    """Val/Test-Sessions ueberlappen mit Train oder mit der Trainings-Historie (AD-22)."""
+
+
+class EmptySplitError(ChamberOBBError):
+    """Der Val-Split ist leer -- kein Ersatz durch Train, kein stilles Weitertrainieren (AD-22)."""
+
+
+class TrainingError(ChamberOBBError):
+    """Trainings- oder Evaluationslauf ist fehlgeschlagen (auch Fehler aus ultralytics, AD-16/AD-20)."""
+
+
+class ManifestError(ChamberOBBError):
+    """Run-Manifest fehlt in einem erwarteten Ort oder ist beschaedigt (AD-24)."""
+
+
+class InferenceError(ChamberOBBError):
+    """Die eigentliche Vorhersage (``model.predict``) ist fehlgeschlagen (AD-16)."""
