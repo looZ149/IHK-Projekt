@@ -112,12 +112,20 @@ widget's JS only runs once `dash` is actually displayed, not when
 `.resume()` returns in Python — so a Python-side correction in between is
 enough, no re-render needed):
 
-- `src/chamber_obb/dashboard.py::_flatten_resumed_selections()` — converts
-  each selection's nested `roi: {center, size, angle}` into the flat
-  `x`/`y`/`w`/`h`/`angle` shape the widget JS actually reads, right after
-  `SequenceDashboard.resume()` returns. No-op for anything already flat, so
-  it stays harmless once/if the upstream fix above lands.
-- Test: `tests/test_dashboard.py::test_resumed_selections_are_flattened_for_the_widget_js`.
+- `src/chamber_obb/dashboard.py::_patched_widget_esm()` / `_AnnotatedDashboard` —
+  a `SequenceDashboard` subclass whose widget JS flattens each nested
+  `roi: {center, size, angle}` entry into the flat `x`/`y`/`w`/`h`/`angle`
+  shape at startup. No-op if the startup line no longer exists in acia.
+- **Do not flatten `dash.selections` in Python** (the first workaround did, and
+  it was wrong): the nested shape is the Python-side contract. The widget writes
+  it back on every edit (`pushSelections`) and `SequenceDashboard.manifest` /
+  `.save()` read `item["roi"]`, so a Python-flattened list made "Save
+  selection.json" and `dash.manifest` fail with `KeyError: 'roi'` until the user
+  edited something. The fix proposed above ("build the flat shape in `resume()`")
+  has the same flaw — the upstream fix belongs in the JS init line (flatten
+  there), not in `resume()`.
+- Test: `tests/test_dashboard.py::test_resumed_selections_stay_nested_so_manifest_and_save_work`
+  and `test_widget_js_flattens_nested_selections_on_startup`.
 - Commit: [`4e433ed`](https://github.com/looZ149/IHK-Projekt/commit/4e433ed62b3feaf92272fa9db6e2e0ea3a7972fc)
   (tag `dashboard-fix-1`), branch `fix/dashboard-resume-flatten-workaround`.
 
