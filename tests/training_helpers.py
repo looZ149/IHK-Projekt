@@ -16,16 +16,28 @@ from chamber_obb.classes import class_list
 
 
 def write_selection(
-    root: Path, name: str, source: str | None = None, rois=None, positions=(0,), registration=None
+    root: Path, name: str, source: str | None = None, rois=None, positions=(0,), registration=None,
+    anchor_frame: int | list[int] | None = None,
 ) -> Path:
-    """Legt ``root/<name>/selection.json`` (+ optional Registrierung) an."""
+    """Legt ``root/<name>/selection.json`` (+ optional Registrierung) an.
+
+    ``anchor_frame``: ``None`` = Feld weglassen (wie acia bei Frame 0), ``int`` = fuer alle ROIs, Liste = je ROI
+    (pro Position dieselbe Reihenfolge wie ``rois``).
+    """
     folder = root / name
     folder.mkdir(parents=True)
     rois = rois or [{"center": [50.0, 40.0], "size": [20.0, 20.0], "angle": 0.0}]
     selection = {
         "source": {"path": source or f"/acq/{name}.nd2", "sizes": {"X": 100, "Y": 80, "T": 5}},
-        "selections": [{"position": p, "roi": roi} for p in positions for roi in rois],
+        "selections": [],
     }
+    for p in positions:
+        for i, roi in enumerate(rois):
+            entry = {"position": p, "roi": roi}
+            anchor = anchor_frame[i] if isinstance(anchor_frame, list) else anchor_frame
+            if anchor:  # acia schreibt anchor_frame nur, wenn es != 0 ist
+                entry["anchor_frame"] = anchor
+            selection["selections"].append(entry)
     (folder / "selection.json").write_text(json.dumps(selection), encoding="utf-8")
     if registration is not None:
         (folder / "registration_transforms.json").write_text(json.dumps(registration), encoding="utf-8")
@@ -38,7 +50,10 @@ class _Frame:
 
 
 class _Position:
+    requested: list[int] = []
+
     def get_frame(self, frame_idx):
+        _Position.requested.append(frame_idx)
         rng = np.random.default_rng(frame_idx)
         return _Frame(rng.integers(0, 4000, size=(80, 100), dtype=np.uint16))
 

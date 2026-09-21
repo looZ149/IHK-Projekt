@@ -38,24 +38,68 @@ def test_rotated_box_corners_are_normalized_and_clipped():
     assert all(0.0 <= c <= 1.0 for c in rotated_box_to_corners(99, 79, 60, 60, 33, 100, 80))
 
 
-def test_registration_propagation_identity_and_shift():
-    transforms = {0: {"dx": 0.0, "dy": 0.0, "theta": 0.0}, 3: {"dx": 5.0, "dy": -2.0, "theta": math.radians(10)}}
-    roi = {"center": [50.0, 40.0], "size": [20.0, 10.0], "angle": 5.0}
-    result = propagate_roi_across_frames(roi, 0, [0, 3, 9], transforms)
+SHAPE = (80, 100)  # (H, W) des Fake-Frames
+
+
+def test_propagation_same_frame_and_reference_frame_are_identity():
+    roi = {"center": [50.0, 40.0], "size": [20, 10], "angle": 5.0}
+    transforms = {3: {"dx": 5.0, "dy": -2.0, "theta": 10.0}}
+    result = propagate_roi_across_frames(roi, 0, [0, 3, 9], transforms, 0, SHAPE)
     assert set(result) == {0, 3}  # Frame 9 hat keine Registrierung
-    assert result[0]["center"] == pytest.approx([50.0, 40.0])
-    assert result[3]["angle"] == pytest.approx(15.0)
-    assert result[3]["size"] == [20.0, 10.0]
-    with pytest.raises(ValueError):
-        propagate_roi_across_frames(roi, 7, [0], transforms)
+    assert result[0]["center"] == pytest.approx([50.0, 40.0]) and result[0]["angle"] == pytest.approx(5.0)
+    back = propagate_roi_across_frames({**roi, "center": result[3]["center"], "angle": result[3]["angle"]},
+                                       3, [0], transforms, 0, SHAPE)
+    assert back[0]["center"] == pytest.approx([50.0, 40.0], abs=1e-6)  # Rundreise Referenz -> 3 -> Referenz
+    assert back[0]["angle"] == pytest.approx(5.0, abs=1e-6)
+    assert result[3]["size"] == [20, 10]
+    with pytest.raises(KeyError):  # Anker ohne Transform
+        propagate_roi_across_frames(roi, 7, [0], transforms, 0, SHAPE)
 
 
-def test_select_target_frames_is_reproducible_and_keeps_annot_frame():
+def test_translation_only_transform_shifts_the_center_by_dx_dy():
+    roi = {"center": [50.0, 40.0], "size": [20, 10], "angle": 0.0}
+    transforms = {4: {"dx": 6.0, "dy": -3.0, "theta": 0.0}}
+    moved = propagate_roi_across_frames(roi, 0, [4], transforms, 0, SHAPE)[4]
+    assert moved["center"] == pytest.approx([56.0, 37.0]) and moved["angle"] == 0.0  # Referenz -> Frame 4 = +(dx, dy)
+
+
+def test_geometry_matches_acia_apply_correction_to_spec():
+    """Rundreise gegen acia selbst: Anker A -> Referenz (acia) == Ziel B -> Referenz (acia) fuer unsere Ziel-ROI."""
+    registration = pytest.importorskip("acia.registration")
+    from acia.base import RotatedCropSpec
+    t_a = registration.FrameTransform(dx=3.0, dy=-2.0, theta=1.5)
+    t_b = registration.FrameTransform(dx=-4.0, dy=5.0, theta=-2.0)
+    roi = {"center": [50.0, 40.0], "size": [20, 10], "angle": 12.0}
+    expected = registration.apply_correction_to_spec(RotatedCropSpec((50.0, 40.0), (20, 10), 12.0), t_a, shape=SHAPE)
+    got = propagate_roi_across_frames(roi, 5, [7], {5: t_a.to_dict(), 7: t_b.to_dict()}, 0, SHAPE)[7]
+    mapped = registration.apply_correction_to_spec(
+        RotatedCropSpec(tuple(got["center"]), (20, 10), got["angle"]), t_b, shape=SHAPE)
+    assert mapped.center == pytest.approx(expected.center, abs=1e-6)
+    assert mapped.angle == pytest.approx(expected.angle, abs=1e-6)
+
+
+@pytest.mark.parametrize("angle", [0.0, 25.0, -40.0, 90.0])
+def test_label_corners_match_acia_crop_convention(angle):
+    """Die Label-Ecken einer ROI muessen genau die Region sein, die acia's crop_rotated begradigt."""
+    base = pytest.importorskip("acia.base")
+    import cv2
+    import numpy as np
+    img_w, img_h, center, size = 200, 160, (100.0, 80.0), (60, 24)
+    corners = np.array(rotated_box_to_corners(*center, *size, angle, img_w, img_h)).reshape(4, 2) * (img_w, img_h)
+    canvas = np.zeros((img_h, img_w), np.uint8)
+    cv2.fillPoly(canvas, [corners.round().astype(np.int32)], 255)
+    crop = base.RotatedCropSequenceSource(None, base.RotatedCropSpec(center, size, angle))._warp(canvas)
+    assert crop.shape == (24, 60)
+    assert (crop > 127).mean() > 0.95  # Ecken und acia-Crop decken dieselbe Region ab (falsches Vorzeichen: << 0.9)
+
+
+def test_select_target_frames_is_reproducible_and_keeps_anchor_frames():
     frames = set(range(20))
-    a = select_target_frames(frames, 0, 5, 42, "chip_pos0")
-    assert a == select_target_frames(frames, 0, 5, 42, "chip_pos0")
-    assert 0 in a and len(a) == 5
-    assert select_target_frames(frames, 0, None, 42) == sorted(frames)
+    a = select_target_frames(frames, [3, 9], 5, 42, "chip_pos0")
+    assert a == select_target_frames(frames, [3, 9], 5, 42, "chip_pos0")
+    assert 3 in a and 9 in a and len(a) == 5
+    assert select_target_frames(frames, [0], None, 42) == sorted(frames)
+    assert select_target_frames({0, 1}, [7], None, 42) == [0, 1, 7]  # Anker zaehlt auch ohne eigenen Transform
 
 
 def test_assign_splits_is_deterministic_and_rejects_conflicts():
@@ -222,10 +266,13 @@ def test_existing_new_dataset_inconsistency_and_threshold_mismatch(tmp_path):
         _build(tmp_path, chips=["b"])
 
 
+def _registration(frames, position=0, reference_frame=0, shift=1.0):
+    return {"records": [{"position": position, "reference_frame": reference_frame, "transforms": {
+        str(i): {"dx": shift * i, "dy": 0.0, "theta": 0.0} for i in frames}}]}
+
+
 def test_registration_exports_multiple_frames(tmp_path):
-    registration = {"records": [{"position": 0, "reference_frame": 0, "transforms": {
-        str(i): {"dx": float(i), "dy": 0.0, "theta": 0.0} for i in range(4)}}]}
-    write_selection(tmp_path / "data", "reg", registration=registration)
+    write_selection(tmp_path / "data", "reg", registration=_registration(range(4)))
     report = _build(tmp_path, use_registration=True, frames_per_position=None, val_ratio=0, test_ratio=0)
     assert report.images_written["train"] == 4
     label1 = (tmp_path / "new" / "labels" / "train" / "reg_pos0_frame001.txt").read_text().split()
@@ -233,10 +280,53 @@ def test_registration_exports_multiple_frames(tmp_path):
     assert float(label1[1]) == pytest.approx(float(label0[1]) + 1 / 100)  # x um dx=1 px verschoben
 
 
-def test_missing_registration_falls_back_to_frame_zero(tmp_path):
-    write_selection(tmp_path / "data", "noreg")
+def test_roi_drawn_on_a_middle_frame_is_exported_from_that_frame(tmp_path):
+    """Das Dashboard oeffnet auf dem MITTLEREN Frame: die ROI gehoert zu ihrem anchor_frame, nicht zu Frame 0."""
+    from training_helpers import _Position
+    write_selection(tmp_path / "data", "mid", anchor_frame=53)
+    _Position.requested.clear()
+    report = _build(tmp_path, val_ratio=0, test_ratio=0)
+    assert _Position.requested == [53]
+    assert (tmp_path / "new" / "images" / "train" / "mid_pos0_frame053.png").is_file()
+    assert not (tmp_path / "new" / "images" / "train" / "mid_pos0_frame000.png").exists()
+    assert report.images_written["train"] == 1 and not report.skipped
+
+
+def test_missing_anchor_field_means_frame_zero(tmp_path):
+    write_selection(tmp_path / "data", "old_format")  # ohne anchor_frame, wie acia bei Frame 0
+    _build(tmp_path, val_ratio=0, test_ratio=0)
+    assert (tmp_path / "new" / "images" / "train" / "old_format_pos0_frame000.png").is_file()
+
+
+def test_registration_carries_a_mid_frame_roi_to_other_frames(tmp_path):
+    write_selection(tmp_path / "data", "mid", anchor_frame=2, registration=_registration(range(5), shift=2.0))
+    _build(tmp_path, use_registration=True, frames_per_position=None, val_ratio=0, test_ratio=0)
+    labels = {f: (tmp_path / "new" / "labels" / "train" / f"mid_pos0_frame{f:03d}.txt").read_text().split() for f in (0, 2, 4)}
+    assert float(labels[2][1]) == pytest.approx(0.4)  # auf dem Anker-Frame unveraendert (Mitte 50, Breite 20 -> 0.4)
+    assert float(labels[4][1]) == pytest.approx(0.4 + 2 * 2.0 / 100)  # Frame 4 ist +4 px gegenueber dem Anker (Frame 2)
+    assert float(labels[0][1]) == pytest.approx(0.4 - 2 * 2.0 / 100)
+
+
+def test_mixed_anchor_frames_need_registration(tmp_path):
+    rois = [{"center": [30.0, 40.0], "size": [20.0, 20.0], "angle": 0.0}, {"center": [70.0, 40.0], "size": [20.0, 20.0], "angle": 0.0}]
+    write_selection(tmp_path / "data", "mixed", rois=rois, anchor_frame=[10, 20])
+    write_selection(tmp_path / "data", "fine")
+    report = _build(tmp_path, val_ratio=0, test_ratio=0)
+    assert "mixed" in report.skipped and "Registrierung" in report.skipped["mixed"]  # sonst waeren ROIs unbeschriftet
+    assert list(report.sessions) == ["fine"]
+
+
+def test_anchor_without_transform_skips_the_position(tmp_path):
+    write_selection(tmp_path / "data", "gap", anchor_frame=9, registration=_registration(range(4)))
+    report = _build(tmp_path, use_registration=True, val_ratio=0, test_ratio=0)
+    assert "gap" in report.skipped and "Transform" in report.skipped["gap"]
+
+
+def test_missing_registration_falls_back_to_the_anchor_frame(tmp_path):
+    write_selection(tmp_path / "data", "noreg", anchor_frame=7)
     report = _build(tmp_path, use_registration=True, frames_per_position=None, val_ratio=0, test_ratio=0)
     assert report.images_written["train"] == 1
+    assert (tmp_path / "new" / "images" / "train" / "noreg_pos0_frame007.png").is_file()
 
 
 def test_small_dataset_warns_about_missing_val_and_test(tmp_path):

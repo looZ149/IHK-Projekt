@@ -54,8 +54,6 @@ _CHECKPOINT_ENV_VAR = "CHAMBER_OBB_CHECKPOINT"
 
 REGISTRATION_FILENAME = "registration_transforms.json"
 SELECTION_FILENAME = "selection.json"
-# Projektweit fester Annotations-Frame (= reference_frame der Registrierung).
-ANNOT_FRAME = 0
 DEFAULT_SEED = 42
 
 
@@ -120,98 +118,104 @@ def rotated_box_to_corners(
     return corners
 
 
-def _rotation_matrix(theta_rad: float) -> np.ndarray:
-    c, s = math.cos(theta_rad), math.sin(theta_rad)
-    return np.array([[c, -s], [s, c]])
+def _forward_matrix(shape: tuple[int, int], transform: dict) -> np.ndarray:
+    """2x3-Matrix Referenz-Frame -> Frame N (acia-Konvention, ``acia.registration._correction_matrix``).
 
-
-def _invert_rigid(R: np.ndarray, t: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    R_inv = R.T
-    return R_inv, -R_inv @ t
-
-
-def transform_point(
-    point: tuple[float, float],
-    theta_from_rad: float, t_from: tuple[float, float],
-    theta_to_rad: float, t_to: tuple[float, float],
-) -> tuple[float, float]:
-    """Ueberfuehrt einen Punkt von den Koordinaten eines Frames in die eines anderen.
-
-    Die gespeicherte Transformation (dx, dy, theta) eines Frames bildet Punkte
-    vom reference_frame IN dieses Frame ab: ``p_frame = R(theta) @ p_ref + t``.
+    ``transform`` = ``{"dx", "dy", "theta"}``: Rotation um die Mitte des GANZEN Frames
+    (``cv2.getRotationMatrix2D``, ``theta`` in GRAD, gegen den Uhrzeigersinn), danach Verschiebung um
+    ``(dx, dy)``. ``shape`` ist ``(H, W)`` des vollen Frames.
     """
-    R_from_inv, t_from_inv = _invert_rigid(_rotation_matrix(theta_from_rad), np.array(t_from))
-    p_ref = R_from_inv @ np.array(point) + t_from_inv
-    p_to = _rotation_matrix(theta_to_rad) @ p_ref + np.array(t_to)
-    return float(p_to[0]), float(p_to[1])
+    height, width = int(shape[0]), int(shape[1])
+    matrix = cv2.getRotationMatrix2D((width / 2.0, height / 2.0), float(transform["theta"]), 1.0)
+    matrix[0, 2] += float(transform["dx"])
+    matrix[1, 2] += float(transform["dy"])
+    return matrix
+
+
+_IDENTITY = {"dx": 0.0, "dy": 0.0, "theta": 0.0}
+
+
+def _transform_of(frame: int, transforms: dict[int, dict], reference_frame: int) -> dict:
+    """Transform eines Frames; der Referenz-Frame ist exakt die Identitaet (wie ``acia``-Export)."""
+    if frame == reference_frame:
+        return _IDENTITY
+    return transforms[frame]
 
 
 def propagate_roi_across_frames(
-    roi: dict, annot_frame: int, target_frames: list[int], transforms: dict[int, dict],
+    roi: dict,
+    anchor_frame: int,
+    target_frames: list[int],
+    transforms: dict[int, dict],
+    reference_frame: int,
+    shape: tuple[int, int],
 ) -> dict[int, dict]:
-    """Berechnet center/angle einer auf ``annot_frame`` gezeichneten ROI fuer jeden Ziel-Frame.
+    """Traegt eine auf ``anchor_frame`` gezeichnete ROI in die Roh-Koordinaten der Ziel-Frames.
 
-    Die Groesse bleibt unveraendert (starre Registrierung, keine Skalierung).
-    Frames ohne Transform werden ausgelassen.
+    Geometrie exakt wie ``acia`` (``apply_correction_to_spec``): die gespeicherten Transformationen
+    gehen Referenz -> Frame N (Rotation um die Frame-Mitte, ``theta`` in Grad, dann ``(dx, dy)``).
+    Punkt: ``p_ref = M_anchor^-1 p_anchor``, ``p_ziel = M_ziel p_ref``; Winkel:
+    ``angle_ziel = angle + theta_anchor - theta_ziel`` (in Referenz-Koordinaten gilt
+    ``angle_ref = angle + theta``). Die Groesse bleibt unveraendert (starre Registrierung).
+    Ziel-Frames ohne Transform werden ausgelassen; fehlt der Anker-Transform, wirft die Funktion ``KeyError``.
+
+    ``roi``: ``{"center": [x, y], "size": [w, h], "angle": Grad}``.
     """
-    if annot_frame not in transforms:
-        raise ValueError(
-            f"Kein Registrierungs-Transform fuer den Annotations-Frame {annot_frame} vorhanden"
-        )
-    t_annot = transforms[annot_frame]
-    cx, cy = roi["center"]
+    anchor_t = _transform_of(anchor_frame, transforms, reference_frame)
+    to_reference = cv2.invertAffineTransform(_forward_matrix(shape, anchor_t))
+    point = np.asarray(roi["center"], dtype=np.float64)
+    p_ref = to_reference[:, :2] @ point + to_reference[:, 2]
     result: dict[int, dict] = {}
-    for frame_idx in target_frames:
-        if frame_idx not in transforms:
+    for frame in target_frames:
+        if frame != reference_frame and frame not in transforms:
             continue
-        t_target = transforms[frame_idx]
-        new_cx, new_cy = transform_point(
-            (cx, cy),
-            t_annot["theta"], (t_annot["dx"], t_annot["dy"]),
-            t_target["theta"], (t_target["dx"], t_target["dy"]),
-        )
-        result[frame_idx] = {
-            "center": [new_cx, new_cy],
+        target_t = _transform_of(frame, transforms, reference_frame)
+        forward = _forward_matrix(shape, target_t)
+        p_target = forward[:, :2] @ p_ref + forward[:, 2]
+        result[frame] = {
+            "center": [float(p_target[0]), float(p_target[1])],
             "size": roi["size"],
-            "angle": roi["angle"] + math.degrees(t_target["theta"] - t_annot["theta"]),
+            "angle": float(roi["angle"]) + float(anchor_t["theta"]) - float(target_t["theta"]),
         }
     return result
 
 
 def load_registration(registration_path: Path) -> dict[int, dict]:
-    """Laedt ``registration_transforms.json`` -> Position -> {transforms, reference_frame}."""
+    """Laedt ``registration_transforms.json`` -> Position -> {transforms, reference_frame}.
+
+    ``theta`` bleibt in Grad (acia-Konvention); ``confidence`` wird nicht gebraucht.
+    """
     data = json.loads(Path(registration_path).read_text(encoding="utf-8"))
     by_position: dict[int, dict] = {}
     for record in data.get("records", []):
         transforms = {
-            int(frame_idx): {"dx": t["dx"], "dy": t["dy"], "theta": t["theta"]}
+            int(frame_idx): {"dx": t["dx"], "dy": t["dy"], "theta": t.get("theta", 0.0)}
             for frame_idx, t in record.get("transforms", {}).items()
         }
         by_position[record["position"]] = {
             "transforms": transforms,
-            "reference_frame": record.get("reference_frame", 0),
+            "reference_frame": int(record.get("reference_frame", 0)),
         }
     return by_position
 
 
 def select_target_frames(
-    valid_frames: set[int], annot_frame: int, count: int | None, seed: int, seed_key: str = ""
+    valid_frames: set[int], must_include: Iterable[int], count: int | None, seed: int, seed_key: str = ""
 ) -> list[int]:
     """Waehlt reproduzierbar (seed + seed_key) Ziel-Frames aus den registrierten Frames.
 
-    ``count=None``: alle. Der Annotations-Frame ist immer dabei. Die Auswahl
-    betrifft nur, WELCHE Frames exportiert werden -- die Box wird pro Frame
-    korrekt ueber die Registrierung berechnet.
+    ``count=None``: alle. Die Anker-Frames (``must_include``) sind immer dabei. Die Auswahl betrifft
+    nur, WELCHE Frames exportiert werden -- die Boxen werden pro Frame korrekt ueber die
+    Registrierung berechnet.
     """
-    frames = sorted(valid_frames)
+    frames = sorted(valid_frames | set(must_include))
+    required = sorted(set(must_include))
     if count is None or count >= len(frames):
         return frames
-    count = max(1, count)
-    remaining = [f for f in frames if f != annot_frame]
+    remaining = [f for f in frames if f not in required]
     digest = hashlib.sha256(f"{seed}:{seed_key}".encode()).hexdigest()
     random.Random(int(digest, 16)).shuffle(remaining)
-    chosen = set(remaining[: max(0, count - 1)])
-    chosen.add(annot_frame)
+    chosen = set(required) | set(remaining[: max(0, max(1, count) - len(required))])
     return sorted(chosen)
 
 
@@ -295,15 +299,28 @@ def _process_chip(
     frames_per_position: int | None,
     threshold: float,
     seed: int,
-) -> int:
-    """Schreibt Bild/Label-Paare eines Chip-Ordners; gibt die Anzahl zurueck."""
+) -> tuple[int, list[str]]:
+    """Schreibt Bild/Label-Paare eines Chip-Ordners; gibt (Anzahl, Warnungen) zurueck.
+
+    Jede ROI gehoert zu dem Frame, auf dem sie gezeichnet wurde (``anchor_frame`` in
+    ``selection.json``; fehlt das Feld, ist es Frame 0, wie bei aelteren Dateien). Das Dashboard
+    oeffnet standardmaessig auf dem MITTLEREN Frame -- ein Bild wird deshalb immer vom Anker-Frame
+    exportiert, nie stillschweigend von Frame 0.
+
+    - Ohne Registrierung: nur Anker-Frames. Liegen die ROIs einer Position auf verschiedenen
+      Frames, wuerde jedes Bild ROIs der anderen Frames unbeschriftet lassen (falsche Negative) --
+      diese Position wird uebersprungen und gemeldet.
+    - Mit Registrierung: Anker-Frames plus (``frames_per_position``) weitere registrierte Frames;
+      alle ROIs werden per ``propagate_roi_across_frames`` in jeden Ziel-Frame getragen.
+    """
     source = selection["source"]
     img_w, img_h = source["sizes"]["X"], source["sizes"]["Y"]
+    shape = (img_h, img_w)
 
-    rois_by_position: dict[int, list[dict]] = {}
+    entries_by_position: dict[int, list[tuple[dict, int]]] = {}
     for sel in selection.get("selections", []):
-        rois_by_position.setdefault(sel["position"], []).append(sel["roi"])
-    if not rois_by_position:
+        entries_by_position.setdefault(sel["position"], []).append((sel["roi"], int(sel.get("anchor_frame", 0))))
+    if not entries_by_position:
         raise DatasetBuildError("keine Annotationen in selection.json")
 
     registration_by_position: dict[int, dict] = {}
@@ -313,42 +330,57 @@ def _process_chip(
             registration_by_position = load_registration(registration_path)
         else:
             logger.warning(
-                "%s: use_registration gesetzt, aber %s fehlt -- nur Frame %d (kein unkorrigierter "
+                "%s: use_registration gesetzt, aber %s fehlt -- nur Anker-Frames (kein unkorrigierter "
                 "Ersatz-Frame, um keine falschen Labels zu erzeugen)",
-                folder.name, REGISTRATION_FILENAME, ANNOT_FRAME,
+                folder.name, REGISTRATION_FILENAME,
             )
 
     images_dir.mkdir(parents=True, exist_ok=True)
     labels_dir.mkdir(parents=True, exist_ok=True)
     written = 0
+    warnings: list[str] = []
     with open_sequence(source["path"]) as seq:
-        for pos, rois in sorted(rois_by_position.items()):
+        for pos, entries in sorted(entries_by_position.items()):
             pos_source = seq.position(pos)
+            anchors = sorted({anchor for _, anchor in entries})
             reg = registration_by_position.get(pos)
-            # Ohne Registrierung wird NUR der annotierte Frame exportiert: ein anderer
-            # Frame mit unveraenderter Box waere falsch beschriftet.
-            target_frames = [ANNOT_FRAME]
+            transforms = reg["transforms"] if reg else {}
+            reference_frame = reg["reference_frame"] if reg else 0
+
+            if reg is None and len(anchors) > 1:
+                warnings.append(
+                    f"{folder.name} Position {pos}: ROIs auf verschiedenen Frames {anchors} brauchen "
+                    f"eine Registrierung -- Position uebersprungen"
+                )
+                continue
+            missing = [a for a in anchors if reg is not None and a != reference_frame and a not in transforms]
+            if missing:
+                warnings.append(
+                    f"{folder.name} Position {pos}: kein Registrierungs-Transform fuer Anker-Frame(s) "
+                    f"{missing} -- Position uebersprungen"
+                )
+                continue
+
+            target_frames = anchors
             if reg is not None:
                 try:
                     target_frames = select_target_frames(
-                        set(reg["transforms"]), ANNOT_FRAME, frames_per_position, seed,
+                        set(transforms) | {reference_frame}, anchors, frames_per_position, seed,
                         seed_key=f"{folder.name}_pos{pos}",
                     )
-                except Exception:  # defekte Registrierung: bei Frame 0 bleiben
-                    target_frames = [ANNOT_FRAME]
+                except Exception:  # defekte Registrierung: bei den Anker-Frames bleiben
+                    target_frames = anchors
 
             for frame_idx in target_frames:
-                if reg is not None and frame_idx != ANNOT_FRAME:
-                    try:
-                        frame_rois = [
-                            propagate_roi_across_frames(roi, ANNOT_FRAME, [frame_idx], reg["transforms"])[frame_idx]
-                            for roi in rois
-                        ]
-                    except (ValueError, KeyError) as exc:
-                        logger.warning("%s Position %s: %s -- Propagation uebersprungen", folder.name, pos, exc)
-                        continue
+                if reg is None:
+                    frame_rois = [roi for roi, _ in entries]
                 else:
-                    frame_rois = rois
+                    frame_rois = [
+                        propagate_roi_across_frames(
+                            roi, anchor, [frame_idx], transforms, reference_frame, shape
+                        )[frame_idx]
+                        for roi, anchor in entries
+                    ]
 
                 raw = pos_source.get_frame(frame_idx).raw
                 frame = raw[..., 0] if raw.ndim == 3 else raw
@@ -368,7 +400,9 @@ def _process_chip(
                     lines.append(f"{class_id} " + " ".join(f"{c:.6f}" for c in corners))
                 (labels_dir / f"{name}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
                 written += 1
-    return written
+    if written == 0:
+        raise DatasetBuildError("keine verwertbare Position: " + "; ".join(warnings or ["keine Frames exportiert"]))
+    return written, warnings
 
 
 # --------------------------------------------------------------------------
@@ -561,7 +595,7 @@ def build_dataset(
             split = assignment[name]
             _remove_chip_files(new_dataset_path, name)
             try:
-                count = _process_chip(
+                count, chip_warnings = _process_chip(
                     folder, selection,
                     new_dataset_path / "images" / split, new_dataset_path / "labels" / split,
                     opener, use_registration, frames_per_position, channel_aspect_threshold, seed,
@@ -573,6 +607,7 @@ def build_dataset(
                 continue
             processed[name] = split
             images_written[split] += count
+            warnings.extend(chip_warnings)
             descriptor["sessions"][name] = {"split": split, "source_path": selection["source"]["path"]}
             if split == "train":
                 descriptor["locked_train_sessions"] = sorted(set(descriptor["locked_train_sessions"]) | {name})
@@ -585,8 +620,9 @@ def build_dataset(
     for split in ("val", "test"):
         if counts[split] == 0:
             warnings.append(
-                f"new_dataset hat keine {split}-Session: fuer Training nur auf new_data "
-                f"val_chips/test_chips angeben, sonst zusammen mit old_dataset trainieren"
+                f"new_dataset hat keine {split}-Session: val_chips/test_chips aus den neuen Chips "
+                f"angeben oder mehr neue Chips liefern (ein Alt-Datensatz mit all_sessions_trained "
+                f"liefert kein Val/Test)"
             )
     for message in warnings:
         logger.warning(message)
