@@ -335,17 +335,14 @@ def test_small_dataset_warns_about_missing_val_and_test(tmp_path):
     assert any("val" in w for w in report.warnings) and any("test" in w for w in report.warnings)
 
 
-def test_paths_fall_back_to_environment_variables(tmp_path, monkeypatch):
-    old = make_dataset(tmp_path / "old", {"a": "train"})
+def test_paths_must_be_passed_explicitly_no_environment_fallback(tmp_path, monkeypatch):
     _chips(tmp_path / "data", "x")
     monkeypatch.setenv("CHAMBER_OBB_NEW_DATA", str(tmp_path / "data"))
     monkeypatch.setenv("CHAMBER_OBB_NEW_DATASET", str(tmp_path / "new"))
-    monkeypatch.setenv("CHAMBER_OBB_OLD_DATASET", str(old))
-    report = build_dataset(open_sequence=fake_open_sequence(), val_ratio=0, test_ratio=0)
-    assert report.new_dataset == (tmp_path / "new").resolve() and "x" in report.sessions
-    monkeypatch.delenv("CHAMBER_OBB_NEW_DATA")
     with pytest.raises(InvalidParameterError, match="new_data"):
-        build_dataset(new_dataset=tmp_path / "new", open_sequence=fake_open_sequence())
+        build_dataset(None, tmp_path / "new", open_sequence=fake_open_sequence())
+    with pytest.raises(InvalidParameterError, match="new_dataset"):
+        build_dataset(tmp_path / "data", None, open_sequence=fake_open_sequence())
 
 
 @pytest.mark.parametrize("kwargs", [{"val_ratio": 0.7, "test_ratio": 0.5}, {"channel_aspect_threshold": 1.0}])

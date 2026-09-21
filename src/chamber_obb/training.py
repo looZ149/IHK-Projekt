@@ -48,9 +48,6 @@ from chamber_obb.manifest import MANIFEST_FILENAME, MANIFEST_SCHEMA_VERSION, fin
 
 logger = logging.getLogger(__name__)
 
-OLD_DATASET_ENV_VAR = "CHAMBER_OBB_OLD_DATASET"
-NEW_DATASET_ENV_VAR = "CHAMBER_OBB_NEW_DATASET"
-RUNS_DIR_ENV_VAR = "CHAMBER_OBB_RUNS_DIR"
 _CHECKPOINT_ENV_VAR = "CHAMBER_OBB_CHECKPOINT"
 
 # Defaults aus training/config.py (legacy) -- pro Aufruf ueber ``hyperparameters`` ueberschreibbar.
@@ -104,9 +101,8 @@ class _Dataset:
     images: dict[str, list[Path]]
 
 
-def _resolve(value: str | Path | None, env_var: str) -> Path | None:
-    raw = value if value is not None else os.environ.get(env_var)
-    return Path(raw).expanduser().resolve() if raw else None
+def _resolve(value: str | Path | None) -> Path | None:
+    return Path(value).expanduser().resolve() if value else None
 
 
 def _load_dataset(role: str, root: Path) -> _Dataset:
@@ -186,9 +182,9 @@ def train(
 
     ``mode`` waehlt die Trainingsdaten: ``"new"``, ``"old"`` oder ``"both"``;
     ohne Angabe gilt ``"both"``, wenn beide Pfade vorliegen, sonst der eine.
-    Pfade fallen auf ``CHAMBER_OBB_NEW_DATASET`` / ``CHAMBER_OBB_OLD_DATASET`` /
-    ``CHAMBER_OBB_CHECKPOINT`` zurueck (AD-8); Run-Verzeichnisse liegen unter
-    ``runs_dir`` (sonst ``CHAMBER_OBB_RUNS_DIR``, sonst ``./runs/chamber_obb``).
+    Die Pfade werden explizit uebergeben (AD-8); nur ``base_checkpoint`` faellt wie bei
+    ``analyze()`` auf ``CHAMBER_OBB_CHECKPOINT`` zurueck. Run-Verzeichnisse liegen unter
+    ``runs_dir`` (sonst ``./runs/chamber_obb``).
 
     Gates vor dem Fitten -- jede Verletzung wirft, bevor GPU-Zeit verbraucht wird:
     Klassenliste (AD-21; ``reinit_head=True`` erlaubt einen Basis-Checkpoint mit
@@ -209,13 +205,13 @@ def train(
         InvalidParameterError, ModelLoadError, DatasetDescriptorError,
         ClassListMismatchError, LeakageError, EmptySplitError, TrainingError.
     """
-    new_root = _resolve(new_dataset, NEW_DATASET_ENV_VAR)
-    old_root = _resolve(old_dataset, OLD_DATASET_ENV_VAR)
+    new_root = _resolve(new_dataset)
+    old_root = _resolve(old_dataset)
     if mode not in (None, "new", "old", "both"):
         raise InvalidParameterError(f"mode muss 'new', 'old' oder 'both' sein, nicht {mode!r}")
     chosen = mode or ("both" if new_root and old_root else "new" if new_root else "old" if old_root else None)
     if chosen is None:
-        raise InvalidParameterError("weder new_dataset noch old_dataset angegeben (auch keine Umgebungsvariablen gesetzt)")
+        raise InvalidParameterError("weder new_dataset noch old_dataset angegeben")
     if chosen in ("new", "both") and new_root is None:
         raise InvalidParameterError(f"mode={chosen!r} braucht new_dataset")
     if chosen in ("old", "both") and old_root is None:
@@ -315,7 +311,7 @@ def train(
         logger.warning(warnings[-1])
 
     # --- Run-Verzeichnis, Bildlisten, data.yaml (AD-24) ----------------------
-    runs_root = _resolve(runs_dir, RUNS_DIR_ENV_VAR) or (Path.cwd() / "runs" / "chamber_obb").resolve()
+    runs_root = _resolve(runs_dir) or (Path.cwd() / "runs" / "chamber_obb").resolve()
     run_dir = _new_run_dir(runs_root, run_name)
     lists_dir = run_dir / "lists"
     lists_dir.mkdir()

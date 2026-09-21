@@ -13,7 +13,6 @@ import hashlib
 import json
 import logging
 import math
-import os
 import random
 import shutil
 from collections.abc import Callable, Iterable
@@ -47,11 +46,6 @@ from chamber_obb.preprocessing import normalize_to_8bit
 
 logger = logging.getLogger(__name__)
 
-OLD_DATASET_ENV_VAR = "CHAMBER_OBB_OLD_DATASET"
-NEW_DATA_ENV_VAR = "CHAMBER_OBB_NEW_DATA"
-NEW_DATASET_ENV_VAR = "CHAMBER_OBB_NEW_DATASET"
-_CHECKPOINT_ENV_VAR = "CHAMBER_OBB_CHECKPOINT"
-
 REGISTRATION_FILENAME = "registration_transforms.json"
 SELECTION_FILENAME = "selection.json"
 DEFAULT_SEED = 42
@@ -74,13 +68,12 @@ class BuildReport:
 # Pfade
 # --------------------------------------------------------------------------
 
-def _resolve_path(value: str | Path | None, env_var: str, label: str, required: bool = True) -> Path | None:
-    raw = value if value is not None else os.environ.get(env_var)
-    if not raw:
+def _resolve_path(value: str | Path | None, label: str, required: bool = True) -> Path | None:
+    if not value:
         if required:
-            raise InvalidParameterError(f"{label} nicht angegeben und {env_var} nicht gesetzt")
+            raise InvalidParameterError(f"{label} nicht angegeben")
         return None
-    return Path(raw).expanduser().resolve()
+    return Path(value).expanduser().resolve()
 
 
 def _is_within(child: Path, parent: Path) -> bool:
@@ -426,8 +419,8 @@ def _old_dataset_view(old_dataset: Path | None) -> tuple[Descriptor | None, set[
 
 
 def build_dataset(
-    new_data: str | Path | None = None,
-    new_dataset: str | Path | None = None,
+    new_data: str | Path,
+    new_dataset: str | Path,
     old_dataset: str | Path | None = None,
     *,
     chips: Iterable[str] | None = None,
@@ -449,15 +442,12 @@ def build_dataset(
 
     ``new_data``: Ordner mit Chip-Unterordnern (``selection.json`` + Aufnahme
     [+ ``registration_transforms.json``]). ``new_dataset``: Ausgabeordner, der
-    einzige Ort, in den geschrieben wird. ``old_dataset``: geteilter Alt-Datensatz,
+    einzige Ort, in den geschrieben wird. ``old_dataset`` (optional): geteilter Alt-Datensatz,
     nur lesend -- seine Sperrliste und Val/Test-Sessions schuetzen den neuen
-    Datensatz vor Leakage (AD-12). Alle drei fallen auf
-    ``CHAMBER_OBB_NEW_DATA`` / ``CHAMBER_OBB_NEW_DATASET`` / ``CHAMBER_OBB_OLD_DATASET``
-    zurueck (AD-8).
+    Datensatz vor Leakage (AD-12). Alle Pfade werden explizit uebergeben (AD-8).
 
-    Die Trainings-Historie des Basis-Checkpoints (``base_checkpoint``, sonst
-    ``CHAMBER_OBB_CHECKPOINT``, oder ein explizites ``prior_manifest``) sperrt
-    zusaetzlich Sessions auf Train. Additiv: nur die uebergebenen Chip-Ordner
+    Die Trainings-Historie des Basis-Checkpoints (``base_checkpoint`` oder ein
+    explizites ``prior_manifest``) sperrt zusaetzlich Sessions auf Train. Additiv: nur die uebergebenen Chip-Ordner
     werden hinzugefuegt/ueberschrieben, bestehende Sessions behalten ihren Split;
     ``rebuild=True`` leert Bilder/Labels und teilt neu auf (die Sperrliste bleibt).
     Fehlerhafte Chip-Ordner werden uebersprungen und im Bericht genannt.
@@ -467,9 +457,9 @@ def build_dataset(
         DatasetDescriptorError: ``dataset.json`` fehlt/ist beschaedigt/inkonsistent.
         DatasetBuildError: ``acia`` fehlt, obwohl eine Aufnahme geoeffnet werden muss.
     """
-    new_data_path = _resolve_path(new_data, NEW_DATA_ENV_VAR, "new_data")
-    new_dataset_path = _resolve_path(new_dataset, NEW_DATASET_ENV_VAR, "new_dataset")
-    old_dataset_path = _resolve_path(old_dataset, OLD_DATASET_ENV_VAR, "old_dataset", required=False)
+    new_data_path = _resolve_path(new_data, "new_data")
+    new_dataset_path = _resolve_path(new_dataset, "new_dataset")
+    old_dataset_path = _resolve_path(old_dataset, "old_dataset", required=False)
     assert new_data_path is not None and new_dataset_path is not None
     check_dataset_paths(new_dataset_path, old_dataset_path)
     if not new_data_path.is_dir():
@@ -484,8 +474,7 @@ def build_dataset(
 
     _, old_locked, old_val_test, old_sources = _old_dataset_view(old_dataset_path)
 
-    checkpoint = base_checkpoint if base_checkpoint is not None else os.environ.get(_CHECKPOINT_ENV_VAR)
-    lineage = trained_sessions_of(checkpoint, prior_manifest) or set()
+    lineage = trained_sessions_of(base_checkpoint, prior_manifest) or set()
 
     skipped: dict[str, str] = {}
     with dataset_write_lock(new_dataset_path):

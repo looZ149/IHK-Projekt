@@ -32,8 +32,7 @@ def fake_yolo(monkeypatch):
     FakeYOLO.names_for_ref = {}
     FakeYOLO.fail_train = False
     monkeypatch.setattr(training, "YOLO", FakeYOLO)
-    for var in ("CHAMBER_OBB_CHECKPOINT", "CHAMBER_OBB_OLD_DATASET", "CHAMBER_OBB_NEW_DATASET", "CHAMBER_OBB_RUNS_DIR"):
-        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("CHAMBER_OBB_CHECKPOINT", raising=False)
 
 
 @pytest.fixture
@@ -116,14 +115,16 @@ def test_modes_new_old_both(world):
         train(base_checkpoint=world["ckpt"], runs_dir=world["runs"])
 
 
-def test_environment_fallbacks(world, monkeypatch):
-    monkeypatch.setenv("CHAMBER_OBB_NEW_DATASET", str(world["new"]))
-    monkeypatch.setenv("CHAMBER_OBB_OLD_DATASET", str(world["old"]))
+def test_only_the_checkpoint_falls_back_to_the_environment(world, monkeypatch):
     monkeypatch.setenv("CHAMBER_OBB_CHECKPOINT", str(world["ckpt"]))
-    monkeypatch.setenv("CHAMBER_OBB_RUNS_DIR", str(world["runs"]))
-    result = train(hyperparameters={"epochs": 1})
+    result = train(world["new"], world["old"], runs_dir=world["runs"], hyperparameters={"epochs": 1})
     assert result.run_dir.parent == world["runs"].resolve()
     assert os.environ["CHAMBER_OBB_CHECKPOINT"] == str(world["ckpt"])  # AD-15: nie umgesetzt
+    # Datensatz- und Run-Pfade haben keine Umgebungsvariablen: sie muessen uebergeben werden
+    monkeypatch.setenv("CHAMBER_OBB_NEW_DATASET", str(world["new"]))
+    monkeypatch.setenv("CHAMBER_OBB_OLD_DATASET", str(world["old"]))
+    with pytest.raises(InvalidParameterError, match="weder"):
+        train(base_checkpoint=world["ckpt"], runs_dir=world["runs"])
 
 
 def test_missing_or_unloadable_base_checkpoint(world, monkeypatch):

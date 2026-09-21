@@ -175,13 +175,13 @@ Ordner auf dem KIT-Rechner (`old_dataset`) und wird **nur gelesen**.
 
 ### Pfade
 
-| Name | Bedeutung | Umgebungsvariable |
-| --- | --- | --- |
-| `old_dataset` | Gemeinsamer, bisheriger YOLO-Datensatz (nur lesend) | `CHAMBER_OBB_OLD_DATASET` |
-| `new_data` | Neue, kuratierte Chip-Ordner (`selection.json` + Aufnahme, optional `registration_transforms.json`) aus dem Notebook `SequencePreprocessing` | `CHAMBER_OBB_NEW_DATA` |
-| `new_dataset` | Ausgabe von `build_dataset()`: der neue Datensatz | `CHAMBER_OBB_NEW_DATASET` |
-| `base_checkpoint` | Gewichte, ab denen weitertrainiert wird (dasselbe wie für `analyze()`) | `CHAMBER_OBB_CHECKPOINT` |
-| `runs_dir` | Ordner für die Trainingsläufe | `CHAMBER_OBB_RUNS_DIR` |
+| Name | Bedeutung |
+| --- | --- |
+| `old_dataset` | Gemeinsamer, bisheriger YOLO-Datensatz (nur lesend) |
+| `new_data` | Neue, kuratierte Chip-Ordner (`selection.json` + Aufnahme, optional `registration_transforms.json`) aus dem Annotations-Notebook |
+| `new_dataset` | Ausgabe von `build_dataset()`: der neue Datensatz |
+| `base_checkpoint` | Gewichte, ab denen weitertrainiert wird (dasselbe wie für `analyze()`; fehlt der Parameter, gilt wie dort `CHAMBER_OBB_CHECKPOINT`) |
+| `runs_dir` | Ordner für die Trainingsläufe (ohne Angabe: `./runs/chamber_obb`) |
 
 ### Ablauf
 
