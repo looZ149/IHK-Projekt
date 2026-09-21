@@ -13,6 +13,7 @@ dependencies = [
     "numpy>=2.5.2",
     "tifffile>=2026.8.23",
     "opencv-python==5.0.0.93",
+    "pyyaml>=6.0",  # data.yaml der Trainingslaeufe (train()); kommt auch ueber ultralytics
 ]
 
 # acia is only needed by chamber_obb.dashboard (AD-2) -- never a hard
