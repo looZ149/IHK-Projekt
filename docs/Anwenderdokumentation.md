@@ -197,7 +197,12 @@ print(result.val, result.test, result.best_weights)                       # 4. M
 ```
 
 - **`build_dataset()`** wandelt die Chip-Ordner in einen YOLO-OBB-Datensatz
-  um. Der Split erfolgt **pro Chip-Ordner (Session)**, nie pro Bild. Es wird
+  um. Jede ROI wird von dem Frame exportiert, auf dem sie gezeichnet wurde
+  (`anchor_frame` in `selection.json`; das Dashboard öffnet auf dem mittleren Frame).
+  Ohne Registrierung entsteht ein Bild pro Position und Anker-Frame; liegen die
+  ROIs einer Position auf verschiedenen Frames, wird sie ohne Registrierung
+  übersprungen. Mit `use_registration=True` und einer
+  `registration_transforms.json` werden die ROIs auf weitere Frames übertragen. Der Split erfolgt **pro Chip-Ordner (Session)**, nie pro Bild. Es wird
   nur in `new_dataset` geschrieben und standardmäßig **additiv** gearbeitet:
   Bestehende Sessions behalten ihren Split; `rebuild=True` leert und teilt neu
   auf. Sessions, die bereits im Training waren, bleiben für immer in Train.
