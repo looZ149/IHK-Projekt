@@ -15,7 +15,7 @@ import numpy as np
 from ultralytics import YOLO
 from ultralytics.engine.results import Results
 
-from chamber_obb.errors import InvalidParameterError, ModelLoadError
+from chamber_obb.errors import InferenceError, InvalidParameterError, ModelLoadError
 
 logger = logging.getLogger(__name__)
 
@@ -101,5 +101,9 @@ def run_inference(
         raise ModelLoadError(f"checkpoint path does not exist: {checkpoint_path}")
 
     model = _get_model(checkpoint_path)
-    results = model.predict(image, conf=conf, save=False, verbose=False)
+    try:
+        results = model.predict(image, conf=conf, save=False, verbose=False)
+    except Exception as exc:  # AD-16: nichts ausser ChamberOBBError verlaesst analyze()
+        logger.error("prediction failed for checkpoint %s: %s", checkpoint_path, exc)
+        raise InferenceError(f"prediction failed for checkpoint {checkpoint_path}: {exc}") from exc
     return results[0]

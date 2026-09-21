@@ -147,35 +147,53 @@ def _detect_rois_for_frames(
     return selections
 
 
-def _flatten_resumed_selections(dash: SequenceDashboard) -> None:
+# Die Zeile, mit der das Widget-JS ``model.get("selections")`` beim Start
+# uebernimmt (acia/notebook.py, ``_SEQUENCE_DASHBOARD_ESM``).
+_JS_SELECTIONS_INIT = (
+    'let selections = (model.get("selections") || []).map((x) => Object.assign({}, x));'
+)
+
+# Ersatz: flacht verschachtelte Eintraege beim Start zur flachen JS-Form ab.
+_JS_SELECTIONS_INIT_FLATTENING = """let selections = (model.get("selections") || []).map((x) => {
+    const s = Object.assign({}, x);
+    if (s.roi) {
+      s.x = s.roi.center[0]; s.y = s.roi.center[1];
+      s.w = s.roi.size[0]; s.h = s.roi.size[1];
+      s.angle = s.roi.angle;
+      delete s.roi;
+    }
+    return s;
+  });"""
+
+
+def _patched_widget_esm(esm: str) -> str:
     """Workaround fuer einen acia-core-Bug (siehe ``docs/issues.md``):
     ``SequenceDashboard.resume()`` setzt ``dash.selections`` im
     verschachtelten On-Disk-Format (``{"roi": {"center", "size", "angle"}}``),
     aber das Widget-JS liest beim Rendern ausschliesslich das flache Format
-    (``x``/``y``/``w``/``h``/``angle`` direkt auf jedem Eintrag), wie es
-    interaktiv gezeichnete ROIs verwenden -- nichts konvertiert zwischen
-    beiden. Eine resumte Box wird dadurch nur als toter Punkt gerendert und
-    stuerzt beim Anklicken ab (``sel.angle.toFixed`` auf ``undefined``).
+    (``x``/``y``/``w``/``h``/``angle``), wie es interaktiv gezeichnete ROIs
+    verwenden -- nichts konvertiert beim Start. Eine resumte Box wird dadurch
+    nur als toter Punkt gerendert und stuerzt beim Anklicken ab
+    (``sel.angle.toFixed`` auf ``undefined``).
 
-    Laeuft, bevor das Widget jemals angezeigt wird (Jupyter loest anywidgets
-    JS-``render()`` erst beim Anzeigen von ``dash`` aus, nicht bei dieser
-    Zuweisung) -- die Korrektur hier reicht deshalb aus, kein erneutes
-    Rendern noetig. Ein No-Op fuer jeden bereits flachen Eintrag, damit
-    dieser Workaround harmlos bleibt, sobald der Upstream-Bug behoben ist.
+    Die Korrektur gehoert ins JS und nicht nach ``dash.selections``: auf der
+    Python-Seite ist das verschachtelte Format der Vertrag -- das Widget
+    schreibt es bei jeder Aenderung zurueck (``pushSelections``), und
+    ``SequenceDashboard.manifest``/``.save()`` lesen ``item["roi"]``. Ein in
+    Python abgeflachtes ``dash.selections`` liess "Save selection.json" (und
+    ``dash.manifest``) mit ``KeyError: 'roi'`` scheitern, solange der Nutzer
+    nichts editiert hatte.
+
+    Ein No-Op, falls die Zeile im installierten acia nicht mehr vorkommt
+    (Upstream behoben oder geaendert).
     """
-    fixed = []
-    for sel in dash.selections:
-        roi = sel.get("roi")
-        if roi is None:
-            fixed.append(sel)
-            continue
-        sel = dict(sel)
-        roi = sel.pop("roi")
-        sel["x"], sel["y"] = roi["center"]
-        sel["w"], sel["h"] = roi["size"]
-        sel["angle"] = roi["angle"]
-        fixed.append(sel)
-    dash.selections = fixed
+    return esm.replace(_JS_SELECTIONS_INIT, _JS_SELECTIONS_INIT_FLATTENING)
+
+
+class _AnnotatedDashboard(SequenceDashboard):
+    """``SequenceDashboard`` mit dem JS-Startup-Fix aus ``_patched_widget_esm``."""
+
+    _esm = _patched_widget_esm(SequenceDashboard._esm)
 
 
 def open_annotated_dashboard(
@@ -260,13 +278,12 @@ def open_annotated_dashboard(
                 selections=selections,
                 roi_mode=roi_mode,
             )
-            dash = SequenceDashboard.resume(
+            dash = _AnnotatedDashboard.resume(
                 manifest,
                 source=seqfile,
                 save_dir=save_dir,
                 preview_frame=frame_index,
             )
-            _flatten_resumed_selections(dash)
             return dash
         except ChamberOBBError:
             raise

@@ -37,3 +37,21 @@ def test_run_inference_raises_invalid_parameter_error_for_out_of_range_conf(tmp_
 
     with pytest.raises(InvalidParameterError, match="1.5"):
         run_inference(array, checkpoint_path=checkpoint, conf=1.5)
+
+
+def test_run_inference_wraps_predict_failures_in_inference_error(tmp_path, monkeypatch):
+    """AD-16: ein Fehler aus ultralytics' predict() ist ein ChamberOBBError, kein nackter RuntimeError."""
+    from chamber_obb import inference
+    from chamber_obb.errors import ChamberOBBError, InferenceError
+
+    class _Boom:
+        def predict(self, *args, **kwargs):
+            raise RuntimeError("CUDA error")
+
+    checkpoint = tmp_path / "checkpoint.pt"
+    checkpoint.write_bytes(b"x")
+    monkeypatch.setattr(inference, "_get_model", lambda path: _Boom())
+
+    with pytest.raises(InferenceError, match="CUDA error") as info:
+        run_inference(np.zeros((640, 640, 3), dtype=np.uint8), checkpoint_path=checkpoint)
+    assert isinstance(info.value, ChamberOBBError)

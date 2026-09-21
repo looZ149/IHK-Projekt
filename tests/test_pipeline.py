@@ -178,14 +178,18 @@ def test_analyze_already_3_channel_uint8_array_passes_through_end_to_end(monkeyp
     assert len(detections) == 1
 
 
-def test_public_namespace_exposes_only_analyze_and_frame_metadata():
-    """AD-2: ``__all__`` names exactly the public API -- not preprocessing/inference/postprocessing.
+def test_public_namespace_exposes_only_the_documented_surface():
+    """AD-2 (amended for CAP-7): ``__all__`` names exactly the public API -- ``analyze`` for detection,
+    ``build_dataset``/``train`` (with their typed payloads) for training -- not preprocessing/inference/postprocessing.
 
     Python's import machinery also binds submodules (``chamber_obb.pipeline`` etc.)
     as attributes of the package -- normal for any Python package (numpy, requests, ...)
     and not something ``__all__`` needs to suppress; ``__all__`` is the idiomatic,
     ``from chamber_obb import *``-respected contract for what's public (AD-2).
     """
-    assert chamber_obb.__all__ == ["FrameMetadata", "analyze"]
+    assert chamber_obb.__all__ == [
+        "BuildReport", "FrameMetadata", "Metrics", "TrainResult", "analyze", "build_dataset",
+        "migrate_legacy_dataset", "train",
+    ]
     assert chamber_obb.analyze is analyze
     assert chamber_obb.FrameMetadata is not None

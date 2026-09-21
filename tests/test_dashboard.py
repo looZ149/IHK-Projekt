@@ -28,6 +28,7 @@ pytest.importorskip("anywidget")
 import chamber_obb
 import chamber_obb.dashboard
 import chamber_obb.inference
+from acia.notebook import SequenceDashboard
 from chamber_obb.dashboard import _corners_to_rotated_crop_spec, open_annotated_dashboard
 from chamber_obb.errors import (
     ChamberOBBError,
@@ -183,24 +184,36 @@ def test_no_checkpoint_configured_propagates_model_load_error_unchanged(monkeypa
         open_annotated_dashboard(path, checkpoint_path=None)
 
 
-def test_resumed_selections_are_flattened_for_the_widget_js(monkeypatch, tmp_path):
-    """Workaround for an acia-core bug (docs/issues.md): SequenceDashboard.resume()
-    assigns dash.selections in the nested on-disk shape ({"roi": {"center", "size",
-    "angle"}}), but the widget's JS only ever reads the flat shape (x/y/w/h/angle
-    directly on each entry) that interactively-drawn ROIs use. Left uncorrected, a
-    resumed ROI renders as an inert dot and crashes the editor on click. Verify
-    open_annotated_dashboard() hands back the flat shape instead."""
+def test_resumed_selections_stay_nested_so_manifest_and_save_work(monkeypatch, tmp_path):
+    """dash.selections bleibt im verschachtelten Format (der Python-Vertrag von
+    SequenceDashboard.manifest/.save()); ohne Nutzeredit muss "Save selection.json"
+    funktionieren (frueher KeyError: 'roi')."""
     path = _make_acquisition(tmp_path, n_positions=1, n_timepoints=1)
     monkeypatch.setattr("chamber_obb.dashboard.analyze", lambda *a, **kw: [_detection()])
 
     dash = open_annotated_dashboard(path, checkpoint_path="/fake/checkpoint.pt")
 
     assert len(dash.selections) == 1
-    sel = dash.selections[0]
-    assert "roi" not in sel
-    assert (sel["x"], sel["y"]) == pytest.approx((6.0, 5.5))
-    assert (sel["w"], sel["h"]) == (8, 7)
-    assert sel["angle"] == pytest.approx(0.0)
+    roi = dash.selections[0]["roi"]
+    assert tuple(roi["center"]) == pytest.approx((6.0, 5.5))
+    assert tuple(roi["size"]) == (8, 7)
+    assert roi["angle"] == pytest.approx(0.0)
+
+    m = dash.manifest
+    assert len(m.selections) == 1
+    saved = dash.save(tmp_path / "out")
+    assert saved.endswith("selection.json")
+
+
+def test_widget_js_flattens_nested_selections_on_startup():
+    """Workaround fuer den acia-Bug (docs/issues.md): das JS muss den
+    verschachtelten Eintrag beim Start abflachen. Schlaegt dieser Test fehl, hat
+    sich die Startup-Zeile in acia geaendert -- Workaround pruefen/entfernen."""
+    from chamber_obb.dashboard import _JS_SELECTIONS_INIT, _AnnotatedDashboard
+
+    assert _JS_SELECTIONS_INIT in SequenceDashboard._esm
+    assert _JS_SELECTIONS_INIT not in _AnnotatedDashboard._esm
+    assert "s.angle = s.roi.angle" in _AnnotatedDashboard._esm
 
 
 def test_corners_to_rotated_crop_spec_round_trip():
@@ -261,7 +274,8 @@ def test_default_confidence_matches_inference_default():
     assert chamber_obb.dashboard._DEFAULT_CONFIDENCE == chamber_obb.inference.DEFAULT_CONFIDENCE
 
 
-def test_public_namespace_still_exposes_only_analyze_and_frame_metadata():
-    """AD-3 Regression: chamber_obb/__init__.py ist von dieser Aenderung
-    unberuehrt -- weiterhin exakt {analyze, FrameMetadata}."""
-    assert chamber_obb.__all__ == ["FrameMetadata", "analyze"]
+def test_public_namespace_does_not_expose_the_dashboard():
+    """AD-3 Regression: ``chamber_obb.dashboard`` (acia) bleibt ausserhalb von ``__all__`` und wird
+    von ``chamber_obb/__init__.py`` nicht importiert; die Trainings-API (AD-2, CAP-7) ist erlaubt."""
+    assert "open_annotated_dashboard" not in chamber_obb.__all__
+    assert {"analyze", "FrameMetadata"} <= set(chamber_obb.__all__)
