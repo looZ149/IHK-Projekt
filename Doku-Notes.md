@@ -1,0 +1,3 @@
+# Training
+
+- Falls sich das bestätigt, ist die Konsequenz für deine Projektdokumentation eigentlich positiv formulierbar: Du hast eine echte Generalisierungsgrenze deines Modells sauber mit dem Testsatz aufgedeckt (genau der Zweck von Test!) und kannst sie auf eine konkrete Ursache zurückführen (fehlende Trainingsdaten für diesen Kammertyp) — das ist ein methodisch sauberer Befund, kein "das Modell ist einfach schlecht".

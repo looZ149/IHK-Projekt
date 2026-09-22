@@ -1,0 +1,26 @@
+======================================================================
+Leave-One-Chip-Out CV - 2026-09-21 14:03:05
+======================================================================
+Basis-Modell: yolo26s-obb.pt  imgsz: 640
+Epochs: 150  Patience: 30
+Registrierung: True  Frames/Position: 20
+
+Chip-Ordner                  mAP50   mAP50-95  Precision   Recall
+-----------------------------------------------------------------
+AMM01                        0.995      0.995      0.994    0.992 -> Gut vertreten im Training, daher gute Werte
+    -> chamber_region: P=0.994 R=0.992 mAP50=0.995
+JK025                        0.995      0.995      0.990    0.989 -> Ebenso gut vertreten im Training
+    -> chamber_region: P=0.990 R=0.989 mAP50=0.995
+Judith-Arg-20231126          0.916      0.663      0.645    0.950 
+    -> channel_region: P=0.645 R=0.950 mAP50=0.916
+Judith-Arg-20231127          0.974      0.675      0.845    0.979
+    -> channel_region: P=0.845 R=0.979 mAP50=0.974
+Judith-Leu-20240308          0.538      0.281      0.462    0.646
+    -> channel_region: P=0.462 R=0.646 mAP50=0.538
+Judith-Leu-20240927          0.000      0.000      0.000    0.000 -> Keine Trainingsdaten vorhanden. Einzigartiges Chip-Design das nicht im Training war
+    -> chamber_region: P=0.000 R=0.000 mAP50=0.000
+    -> channel_region: P=0.000 R=0.000 mAP50=0.000
+-----------------------------------------------------------------
+Durchschnitt                 0.736      0.601      0.656    0.759
+
+
