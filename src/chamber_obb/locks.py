@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import re
-import tempfile
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -24,6 +23,7 @@ from typing import TypedDict
 
 from chamber_obb.classes import DEFAULT_CHANNEL_ASPECT_RATIO_THRESHOLD, class_list
 from chamber_obb.errors import DatasetDescriptorError
+from chamber_obb.util import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -180,17 +180,7 @@ def write_descriptor(dataset_root: Path, descriptor: Descriptor) -> None:
     """Schreibt ``dataset.json`` atomar. Aufrufer haelt ``dataset_write_lock``."""
     descriptor["locked_train_sessions"] = sorted(set(descriptor["locked_train_sessions"]))
     payload = json.dumps(descriptor, indent=2, sort_keys=True, ensure_ascii=False)
-    fd, tmp_name = tempfile.mkstemp(dir=dataset_root, prefix=".dataset-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(payload + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(tmp_name, dataset_root / DESCRIPTOR_FILENAME)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.unlink(tmp_name)
-        raise
+    atomic_write_text(dataset_root / DESCRIPTOR_FILENAME, payload + "\n", prefix=".dataset-", fsync=True)
 
 
 def all_sessions_trained(descriptor: Descriptor | None) -> bool:

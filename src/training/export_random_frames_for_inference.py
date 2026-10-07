@@ -23,7 +23,7 @@ Direkt danach Inferenz testen:
     model = YOLO("runs/final/final_model/weights/best.pt")
     model.predict("inference_check", save=True, conf=0.25)
 
-Benoetigt: pip install nd2 pillow numpy
+Benoetigt: pip install nd2 pillow numpy chamber_obb
 """
 
 import argparse
@@ -32,18 +32,11 @@ import random
 import time
 from pathlib import Path
 
-import numpy as np
 from PIL import Image
 
-
-def normalize_to_8bit(img: np.ndarray, p_low: float = 1, p_high: float = 99) -> np.ndarray:
-    """Perzentil-basiertes Kontrast-Stretching statt Min-Max - siehe
-    build_trainingsdata.py fuer die ausfuehrliche Begruendung. Muss identisch
-    zur Trainings-Pipeline bleiben, sonst 'sieht' das Modell hier einen
-    anderen Kontrast-Stil als beim Training."""
-    lo, hi = np.percentile(img, [p_low, p_high])
-    clipped = np.clip(img, lo, hi)
-    return ((clipped - lo) / (hi - lo + 1e-8) * 255).astype(np.uint8)
+# Geteilte Implementierung aus der Trainings-Pipeline (chamber_obb) - der
+# Kontrast-Stil ist damit per Konstruktion identisch zum Training.
+from chamber_obb.preprocessing import normalize_to_8bit
 
 
 def find_nd2_files(search_dir: Path) -> list[Path]:

@@ -7,18 +7,16 @@ Verwendung:
 """
 
 import argparse
-import re
 from collections import Counter
 from pathlib import Path
 
-# Erkennt den Chip-Ordnernamen als Praefix vor "_posN_frameNNN.png"
-NAME_PATTERN = re.compile(r"^(.+)_pos\d+_frame\d+\.\w+$")
+from train_lock import CHIP_IMAGE_NAME_RE
 
 
 def count_by_folder(images_dir: Path) -> Counter:
     counts = Counter()
     for img_path in images_dir.glob("*"):
-        match = NAME_PATTERN.match(img_path.name)
+        match = CHIP_IMAGE_NAME_RE.match(img_path.name)
         if match:
             counts[match.group(1)] += 1
         else:

@@ -5,7 +5,7 @@ auseinanderliegenden Frames derselben Position und speichert beide als PNG.
 Manuell vergleichen: sitzt die Box auf beiden Bildern noch korrekt auf der
 Kolonie/dem Objekt, oder ist sie verschoben?
 
-Falls die Box in die falsche Richtung driftet, in build_training_dataset.py
+Falls die Box in die falsche Richtung driftet, in build_trainingsdata.py
 in transform_point() die Rollen von R_from/R_to bzw. die Vorzeichen von t
 vertauschen (siehe Kommentar dort) und diesen Test wiederholen.
 
@@ -25,14 +25,23 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from acia.segm.open import open_sequence  # Pfad ggf. anpassen
 
+from chamber_obb.dataset import rotated_box_to_corners
+from chamber_obb.preprocessing import normalize_to_8bit
+
 from build_trainingsdata import (
     REGISTRATION_FILENAME,
     load_registration,
-    normalize_to_8bit,
     propagate_roi_across_frames,
-    resolve_frame_index,
-    rotated_box_to_corners,
 )
+
+
+def resolve_frame_index(spec: str, total_frames: int) -> int:
+    """'last'/'mid'/int in einen konkreten Frame-Index aufloesen."""
+    if spec == "last":
+        return total_frames - 1
+    if spec == "mid":
+        return total_frames // 2
+    return int(spec)
 
 
 def draw_box(img_8bit, roi: dict, img_w: int, img_h: int, color: str = "red") -> Image.Image:
@@ -72,7 +81,7 @@ def main() -> None:
         raise SystemExit(f"Keine ROI fuer Position {args.position} in {selection_path} gefunden.")
     roi = rois[0]
 
-    annot_frame = resolve_frame_index(args.annot_frame, total_frames, seed_key=folder.name)
+    annot_frame = resolve_frame_index(args.annot_frame, total_frames)
     registration_by_position = load_registration(registration_path)
     reg = registration_by_position.get(args.position)
     if reg is None:
@@ -103,7 +112,7 @@ def main() -> None:
 
     print("\nManuell pruefen: sitzt die rote Box auf beiden Bildern auf der Kolonie?")
     print("Falls nicht (Box driftet weg statt mit dem Objekt mitzuwandern):")
-    print("  -> in build_training_dataset.py, Funktion transform_point(),")
+    print("  -> in build_trainingsdata.py, Funktion transform_point(),")
     print("     R_from/R_to bzw. Vorzeichen von t vertauschen, dann erneut testen.")
 
 

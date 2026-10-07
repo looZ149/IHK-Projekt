@@ -15,23 +15,7 @@ from chamber_obb.errors import InvalidImageError, ModelLoadError
 from chamber_obb.inference import DEFAULT_CONFIDENCE
 from chamber_obb.pipeline import analyze
 
-
-class _FakeOBB:
-    """Minimaler Stand-in fuer ultralytics' ``Results.obb`` -- kein Modell/GPU noetig."""
-
-    def __init__(self, xyxyxyxy, conf, cls):
-        self.xyxyxyxy = xyxyxyxy
-        self.conf = conf
-        self.cls = cls
-
-    def __len__(self):
-        return len(self.cls)
-
-
-class _FakeResults:
-    def __init__(self, obb, names):
-        self.obb = obb
-        self.names = names
+from fakes import FakeOBB, FakeResults
 
 
 def _one_detection_results():
@@ -39,15 +23,15 @@ def _one_detection_results():
     # original: scale=8/15, new_width=640, new_height=320, pad_top=160 -- so a
     # box between y=200 and y=300 lands within the real (non-padding) content band.
     corners = np.array([[[100.0, 200.0], [300.0, 200.0], [300.0, 300.0], [100.0, 300.0]]])
-    return _FakeResults(
-        obb=_FakeOBB(corners, np.array([0.9]), np.array([0])),
+    return FakeResults(
+        obb=FakeOBB(corners, np.array([0.9]), np.array([0])),
         names={0: "chamber_region", 1: "channel_region"},
     )
 
 
 def _zero_detection_results():
-    return _FakeResults(
-        obb=_FakeOBB(np.zeros((0, 4, 2)), np.zeros((0,)), np.zeros((0,))),
+    return FakeResults(
+        obb=FakeOBB(np.zeros((0, 4, 2)), np.zeros((0,)), np.zeros((0,))),
         names={0: "chamber_region", 1: "channel_region"},
     )
 

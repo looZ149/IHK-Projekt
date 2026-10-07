@@ -14,7 +14,6 @@ Ein Checkpoint wird hier nie "befoerdert" (AD-15): weder wird
 """
 
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from importlib import metadata
@@ -24,6 +23,7 @@ from typing import Literal
 import yaml
 from ultralytics import YOLO
 
+from chamber_obb.checkpoints import CHECKPOINT_ENV_VAR, resolve_checkpoint
 from chamber_obb.classes import class_list
 from chamber_obb.errors import (
     ChamberOBBError,
@@ -45,10 +45,9 @@ from chamber_obb.locks import (
     load_descriptor,
 )
 from chamber_obb.manifest import MANIFEST_FILENAME, MANIFEST_SCHEMA_VERSION, find_manifest, load_manifest, write_manifest
+from chamber_obb.util import resolve_path
 
 logger = logging.getLogger(__name__)
-
-_CHECKPOINT_ENV_VAR = "CHAMBER_OBB_CHECKPOINT"
 
 # Defaults aus training/config.py (legacy) -- pro Aufruf ueber ``hyperparameters`` ueberschreibbar.
 DEFAULT_HYPERPARAMETERS: dict[str, object] = {
@@ -99,10 +98,6 @@ class _Dataset:
     descriptor: Descriptor
     sessions: dict[str, set[str]]
     images: dict[str, list[Path]]
-
-
-def _resolve(value: str | Path | None) -> Path | None:
-    return Path(value).expanduser().resolve() if value else None
 
 
 def _load_dataset(role: str, root: Path) -> _Dataset:
@@ -205,8 +200,8 @@ def train(
         InvalidParameterError, ModelLoadError, DatasetDescriptorError,
         ClassListMismatchError, LeakageError, EmptySplitError, TrainingError.
     """
-    new_root = _resolve(new_dataset)
-    old_root = _resolve(old_dataset)
+    new_root = resolve_path(new_dataset, "new_dataset", required=False)
+    old_root = resolve_path(old_dataset, "old_dataset", required=False)
     if mode not in (None, "new", "old", "both"):
         raise InvalidParameterError(f"mode muss 'new', 'old' oder 'both' sein, nicht {mode!r}")
     chosen = mode or ("both" if new_root and old_root else "new" if new_root else "old" if old_root else None)
@@ -224,9 +219,9 @@ def train(
     params = {**DEFAULT_HYPERPARAMETERS, **overrides}
 
     # --- Basis-Checkpoint ---------------------------------------------------
-    raw_base = base_checkpoint if base_checkpoint is not None else os.environ.get(_CHECKPOINT_ENV_VAR)
+    raw_base = resolve_checkpoint(base_checkpoint)
     if not raw_base:
-        raise ModelLoadError(f"kein base_checkpoint angegeben und {_CHECKPOINT_ENV_VAR} nicht gesetzt")
+        raise ModelLoadError(f"kein base_checkpoint angegeben und {CHECKPOINT_ENV_VAR} nicht gesetzt")
     base_path = Path(raw_base).expanduser()
     is_stock = False
     if base_path.is_file():
@@ -311,7 +306,7 @@ def train(
         logger.warning(warnings[-1])
 
     # --- Run-Verzeichnis, Bildlisten, data.yaml (AD-24) ----------------------
-    runs_root = _resolve(runs_dir) or (Path.cwd() / "runs" / "chamber_obb").resolve()
+    runs_root = resolve_path(runs_dir, "runs_dir", required=False) or (Path.cwd() / "runs" / "chamber_obb").resolve()
     run_dir = _new_run_dir(runs_root, run_name)
     lists_dir = run_dir / "lists"
     lists_dir.mkdir()

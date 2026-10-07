@@ -32,9 +32,9 @@ from ultralytics import YOLO
 
 import config
 from build_trainingsdata import CLASS_NAMES, find_selection_jsons
+from train_lock import LOCK_FILE
 
-LOCK_FILE = Path("train_locked_chips.txt")
-LOCK_FILE_BACKUP = Path("train_locked_chips.txt.cv_backup")
+LOCK_FILE_BACKUP = Path(f"{LOCK_FILE}.cv_backup")
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 BUILD_SCRIPT = SCRIPT_DIR / "build_trainingsdata.py"

@@ -15,28 +15,9 @@ Erzeugt z.B.:
 
 import argparse
 import json
-import math
 from pathlib import Path
 
-
-def rotated_box_to_corners(cx, cy, w, h, angle_deg, img_w, img_h):
-    """Wandelt center+size+angle in vier normalisierte Eckpunkte um (YOLO-OBB-Format)."""
-    angle_rad = math.radians(angle_deg)
-    cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
-
-    dx, dy = w / 2, h / 2
-    corners = [(-dx, -dy), (dx, -dy), (dx, dy), (-dx, dy)]
-
-    yolo_corners = []
-    for x, y in corners:
-        x_rot = x * cos_a - y * sin_a + cx
-        y_rot = x * sin_a + y * cos_a + cy
-        # normalisieren und in [0, 1] clampen (kleine Rundungsfehler an den Raendern)
-        x_norm = min(max(x_rot / img_w, 0.0), 1.0)
-        y_norm = min(max(y_rot / img_h, 0.0), 1.0)
-        yolo_corners.extend([x_norm, y_norm])
-
-    return yolo_corners
+from chamber_obb.dataset import rotated_box_to_corners
 
 
 def convert(json_path, output_dir, prefix, class_id=0):

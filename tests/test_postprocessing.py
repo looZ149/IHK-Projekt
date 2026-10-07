@@ -14,6 +14,8 @@ import pytest
 from chamber_obb.postprocessing import invert_letterbox_coords, postprocess
 from chamber_obb.preprocessing import LetterboxInfo, letterbox_resize
 
+from fakes import FakeOBB, FakeResults
+
 
 def test_invert_letterbox_coords_nonsquare_roundtrip():
     """1200x600 Original -> 640x640 letterboxed -> zurueck in Original-Raum."""
@@ -125,27 +127,9 @@ def test_invert_letterbox_coords_works_on_obb_corner_shape():
     assert inverted == pytest.approx(expected)
 
 
-class _FakeOBB:
-    """Minimaler Stand-in fuer ultralytics' ``Results.obb`` -- kein Modell/GPU noetig."""
-
-    def __init__(self, xyxyxyxy, conf, cls):
-        self.xyxyxyxy = xyxyxyxy
-        self.conf = conf
-        self.cls = cls
-
-    def __len__(self):
-        return len(self.cls)
-
-
-class _FakeResults:
-    def __init__(self, obb, names):
-        self.obb = obb
-        self.names = names
-
-
 def test_postprocess_zero_detections_returns_empty_list():
-    fake_results = _FakeResults(
-        obb=_FakeOBB(np.zeros((0, 4, 2)), np.zeros((0,)), np.zeros((0,))),
+    fake_results = FakeResults(
+        obb=FakeOBB(np.zeros((0, 4, 2)), np.zeros((0,)), np.zeros((0,))),
         names={0: "chamber_region", 1: "channel_region"},
     )
     info = LetterboxInfo(
@@ -161,8 +145,8 @@ def test_postprocess_builds_detections_from_results_names():
     )  # ein Detection-Box in 640-Raum
     conf = np.array([0.91])
     cls = np.array([1])
-    fake_results = _FakeResults(
-        obb=_FakeOBB(corners, conf, cls),
+    fake_results = FakeResults(
+        obb=FakeOBB(corners, conf, cls),
         names={0: "chamber_region", 1: "channel_region"},
     )
     orig = np.zeros((600, 1200, 3), dtype=np.uint8)
@@ -190,8 +174,8 @@ def test_postprocess_keeps_multiple_same_class_detections():
     )
     conf = np.array([0.85, 0.77])
     cls = np.array([0, 0])  # beide dieselbe Klasse
-    fake_results = _FakeResults(
-        obb=_FakeOBB(corners, conf, cls),
+    fake_results = FakeResults(
+        obb=FakeOBB(corners, conf, cls),
         names={0: "chamber_region", 1: "channel_region"},
     )
     info = LetterboxInfo(

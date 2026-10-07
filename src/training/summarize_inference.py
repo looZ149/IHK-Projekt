@@ -10,11 +10,10 @@ wird. Die Chip-Art wird aus dem Dateinamen abgeleitet
 export_random_frames_for_inference.py erzeugt).
 """
 
-import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-NAME_PATTERN = re.compile(r"^(.+)_pos\d+_frame\d+\.\w+$")
+from train_lock import CHIP_IMAGE_NAME_RE
 
 
 def summarize_predictions(results, class_names: dict[int, str]) -> None:
@@ -37,7 +36,7 @@ def summarize_predictions(results, class_names: dict[int, str]) -> None:
         image_path = getattr(r, "path", None)
         chip_name = "<unbekannt>"
         if image_path:
-            match = NAME_PATTERN.match(Path(image_path).name)
+            match = CHIP_IMAGE_NAME_RE.match(Path(image_path).name)
             chip_name = match.group(1) if match else Path(image_path).stem
         chip_total[chip_name] += 1
 

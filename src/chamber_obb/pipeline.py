@@ -7,20 +7,18 @@ als oeffentliche API exportiert -- ``preprocessing``/``inference``/
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import TypedDict
 
 import numpy as np
 
+from chamber_obb.checkpoints import CHECKPOINT_ENV_VAR, resolve_checkpoint
 from chamber_obb.errors import InvalidImageError, ModelLoadError
 from chamber_obb.inference import DEFAULT_CONFIDENCE, run_inference
 from chamber_obb.postprocessing import Detection, postprocess
 from chamber_obb.preprocessing import letterbox_resize, load_and_normalize, normalize_array
 
 logger = logging.getLogger(__name__)
-
-_CHECKPOINT_ENV_VAR = "CHAMBER_OBB_CHECKPOINT"
 
 
 class FrameMetadata(TypedDict, total=False):
@@ -83,13 +81,13 @@ def analyze(
         logger.error("analyze: image is neither a numpy array nor a str/Path: %r", type(image))
         raise InvalidImageError(f"image must be a numpy array or str/Path, got {type(image).__name__}")
 
-    resolved_checkpoint = checkpoint_path or os.environ.get(_CHECKPOINT_ENV_VAR)
+    resolved_checkpoint = resolve_checkpoint(checkpoint_path)
     if not resolved_checkpoint:
         logger.error(
-            "analyze: no checkpoint_path given and %s is not set", _CHECKPOINT_ENV_VAR
+            "analyze: no checkpoint_path given and %s is not set", CHECKPOINT_ENV_VAR
         )
         raise ModelLoadError(
-            f"No checkpoint path given and {_CHECKPOINT_ENV_VAR} is not set"
+            f"No checkpoint path given and {CHECKPOINT_ENV_VAR} is not set"
         )
 
     resized, letterbox_info = letterbox_resize(normalized)

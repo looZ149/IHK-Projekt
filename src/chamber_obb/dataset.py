@@ -43,6 +43,7 @@ from chamber_obb.locks import (
 )
 from chamber_obb.manifest import trained_sessions_of
 from chamber_obb.preprocessing import normalize_to_8bit
+from chamber_obb.util import resolve_path
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +68,6 @@ class BuildReport:
 # --------------------------------------------------------------------------
 # Pfade
 # --------------------------------------------------------------------------
-
-def _resolve_path(value: str | Path | None, label: str, required: bool = True) -> Path | None:
-    if not value:
-        if required:
-            raise InvalidParameterError(f"{label} nicht angegeben")
-        return None
-    return Path(value).expanduser().resolve()
-
 
 def _is_within(child: Path, parent: Path) -> bool:
     return child == parent or parent in child.parents
@@ -457,9 +450,9 @@ def build_dataset(
         DatasetDescriptorError: ``dataset.json`` fehlt/ist beschaedigt/inkonsistent.
         DatasetBuildError: ``acia`` fehlt, obwohl eine Aufnahme geoeffnet werden muss.
     """
-    new_data_path = _resolve_path(new_data, "new_data")
-    new_dataset_path = _resolve_path(new_dataset, "new_dataset")
-    old_dataset_path = _resolve_path(old_dataset, "old_dataset", required=False)
+    new_data_path = resolve_path(new_data, "new_data")
+    new_dataset_path = resolve_path(new_dataset, "new_dataset")
+    old_dataset_path = resolve_path(old_dataset, "old_dataset", required=False)
     assert new_data_path is not None and new_dataset_path is not None
     check_dataset_paths(new_dataset_path, old_dataset_path)
     if not new_data_path.is_dir():

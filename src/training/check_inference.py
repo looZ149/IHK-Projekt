@@ -9,9 +9,10 @@ Verwendung:
 from ultralytics import YOLO
 from summarize_inference import summarize_predictions
 
+from build_trainingsdata import CLASS_NAMES
+
 MODEL_PATH = "/home/ubuntu/work/workspace/Projekt/runs/obb/train/weights/best.pt"  # <- ggf. anpassen
 SOURCE_DIR = "/home/ubuntu/work/workspace/Projekt/src/inference_check"
-CLASS_NAMES = {0: "chamber_region", 1: "channel_region"}
 CONF_THRESHOLD = 0.25
 
 

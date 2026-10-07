@@ -26,7 +26,7 @@ Verwendung:
     python build_training_dataset.py --dataset-root dataset \
         --use-registration --frames-per-position 20
 
-Abhaengigkeiten: acia, pillow, numpy
+Abhaengigkeiten: acia, pillow, numpy, chamber_obb
 """
 
 from __future__ import annotations
@@ -44,6 +44,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 from acia.segm.open import open_sequence  # Pfad ggf. anpassen, falls Modul woanders liegt
+
+from chamber_obb.dataset import rotated_box_to_corners
+from chamber_obb.preprocessing import normalize_to_8bit
 
 from config import CHIPS_PATH, SEED
 from train_lock import discover_filesystem_train_chips, load_locked_chips, update_locked_chips
@@ -68,37 +71,9 @@ ANNOT_FRAME = 0
 # --------------------------------------------------------------------------
 # Bildverarbeitung
 # --------------------------------------------------------------------------
-
-def normalize_to_8bit(img: np.ndarray, p_low: float = 1, p_high: float = 99) -> np.ndarray:
-    """Skaliert ein Bild per Perzentil-Clipping auf 8-bit.
-
-    Robuster als Min-Max-Normalisierung gegenueber Ausreisser-Pixeln und
-    besser geeignet fuer den engen Wertebereich von Phasenkontrast-
-    Mikroskopiebildern.
-    """
-    lo, hi = np.percentile(img, [p_low, p_high])
-    clipped = np.clip(img, lo, hi)
-    return ((clipped - lo) / (hi - lo + 1e-8) * 255).astype(np.uint8)
-
-
-def rotated_box_to_corners(
-    cx: float, cy: float, w: float, h: float, angle_deg: float, img_w: int, img_h: int
-) -> list[float]:
-    """Wandelt center/size/angle in vier normalisierte Eckpunkte um (YOLO-OBB-Format)."""
-    angle_rad = math.radians(angle_deg)
-    cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
-
-    dx, dy = w / 2, h / 2
-    local_corners = [(-dx, -dy), (dx, -dy), (dx, dy), (-dx, dy)]
-
-    corners: list[float] = []
-    for x, y in local_corners:
-        x_rot = x * cos_a - y * sin_a + cx
-        y_rot = x * sin_a + y * cos_a + cy
-        corners.append(min(max(x_rot / img_w, 0.0), 1.0))
-        corners.append(min(max(y_rot / img_h, 0.0), 1.0))
-    return corners
-
+# normalize_to_8bit und rotated_box_to_corners leben an einziger Stelle in
+# der Bibliothek (chamber_obb.preprocessing bzw. chamber_obb.dataset) -
+# identische Implementierungen, frueher als Kopien in diesem Skript.
 
 def classify_roi_by_shape(w: float, h: float) -> int:
     """Bestimmt automatisch die Klasse einer ROI anhand ihres Seitenverhaeltnisses.

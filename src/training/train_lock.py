@@ -24,11 +24,14 @@ from pathlib import Path
 
 LOCK_FILE = Path("train_locked_chips.txt")
 
-# Muss mit build_trainingsdata.py's Bild-Schreibstelle (process_selection_file:
-# name = f"{folder.name}_pos{pos}_frame{frame_idx:03d}") synchron bleiben - kein
-# gemeinsamer Konstantenname, daher hier nur ein Verweis-Kommentar als
-# Desync-Schutz.
+# Namensschema der Chip-Bilddateien (<chip>_pos<N>_frame<M>.<ext>), geschrieben
+# von build_trainingsdata.py's process_selection_file. Beide Muster leben
+# bewusst HIER (eine Stelle) und nicht noch einmal im Builder: train_lock hat
+# null externe Abhaengigkeiten und build_trainingsdata importiert train_lock,
+# nie umgekehrt (Kreisimport). Das Schreib-Format (f-String) bleibt im Builder;
+# die Regexes dazu sind der Desync-Schutz an dieser einen Stelle.
 _CHIP_NAME_SUFFIX_RE = re.compile(r"_pos\d+_frame\d+$")
+CHIP_IMAGE_NAME_RE = re.compile(r"^(.+)_pos\d+_frame\d+\.\w+$")
 
 
 def load_locked_chips() -> set[str]:

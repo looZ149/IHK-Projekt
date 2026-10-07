@@ -8,11 +8,10 @@ Basis-Checkpoints lesen muss.
 
 import json
 import logging
-import os
-import tempfile
 from pathlib import Path
 
 from chamber_obb.errors import ManifestError
+from chamber_obb.util import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -61,14 +60,4 @@ def trained_sessions_of(checkpoint: str | Path | None, manifest: str | Path | No
 def write_manifest(path: Path, data: dict) -> None:
     """Schreibt das Manifest atomar (Temp-Datei + ``os.replace``)."""
     payload = json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False, default=str)
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=".manifest-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(payload + "\n")
-        os.replace(tmp_name, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+    atomic_write_text(path, payload + "\n", prefix=".manifest-")
