@@ -8,11 +8,14 @@ version = "0.1.0"
 description = "Library core for bioprocess chamber/channel OBB detection (preprocess -> infer -> postprocess)."
 requires-python = ">=3.12"
 dependencies = [
-    "ultralytics==8.4.138",
-    "torch==2.14.0",
-    "numpy>=2.5.2",
-    "tifffile>=2026.8.23",
-    "opencv-python==5.0.0.93",
+    # torch nicht festlegen: Auf dem Cloud-Rechner gibt der NVIDIA-Container
+    # die Version per PIP_CONSTRAINT fest vor (passend zu GPU und Treiber).
+    "torch>=2.4",
+    "ultralytics>=8.4.138,<9",
+    "numpy>=1.26",
+    "tifffile>=2023.1.1",
+    # headless: dasselbe cv2 wie bei acia und im Container, ohne GUI-Abhaengigkeiten
+    "opencv-python-headless>=4.8",
     "pyyaml>=6.0",  # data.yaml der Trainingslaeufe (train()); kommt auch ueber ultralytics
 ]
 
